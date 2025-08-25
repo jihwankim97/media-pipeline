@@ -1,64 +1,82 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { updateMediaDto } from './dto/update-media.dto';
 import { createMediaDto } from './dto/create-media.dto';
-
-export interface Media {
-  id: number;
-  title: string;
-  genre: string;
-}
+import { Media } from './entity/media.entity';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Like, Repository } from 'typeorm';
+import { MediaDetail } from './entity/media.detail.entity';
 
 @Injectable()
 export class MediaService {
-  private medias: Media[] = [
-    {
-      id: 12,
-      title: 'media1',
-      genre: 'factasy',
-    },
-    {
-      id: 13,
-      title: 'media2',
-      genre: 'factasy',
-    },
-  ];
-  private idCounter = 3;
+  constructor(
+    @InjectRepository(Media)
+    private readonly mediaRepository: Repository<Media>,
+    @InjectRepository(MediaDetail)
+    private readonly mediadetailRepository: Repository<MediaDetail>,
+  ) {}
 
-  getAllMedias(title: string) {
-    if (!title) return this.medias;
+  async getAllMedias(title: string) {
+    if (!title)
+      return [
+        await this.mediaRepository.find(),
+        await this.mediaRepository.count(),
+      ];
 
-    return this.medias.filter((m) => m.title.startsWith(title));
+    return this.mediaRepository.findAndCount({
+      where: {
+        title: Like(`%${title}%`),
+      },
+    });
   }
 
-  getMediaById(id: number) {
-    const media = this.medias.find((media) => media.id === id);
+  async getMediaById(id: number) {
+    const media = await this.mediaRepository.findOne({
+      where: { id },
+      relations: ['detail'],
+    });
     if (!media) throw new NotFoundException('존재하지 않는 ID입니다.');
 
     return media;
   }
 
-  createMedia(dto: createMediaDto) {
-    const media = { id: this.idCounter++, ...dto };
-    this.medias.push(media);
+  async createMedia(dto: createMediaDto) {
+    const mediaDetail = await this.mediadetailRepository.save({
+      detail: dto.detail,
+    });
+    const media = await this.mediaRepository.save({
+      title: dto.title,
+      genre: dto.genre,
+      detail: mediaDetail,
+    });
     return media;
   }
 
-  updateMedia(id: number, dto: updateMediaDto) {
-    const media = this.medias.find((media) => media.id === id);
-    if (!media) throw new NotFoundException('존재하지 않는 ID입니다.');
+  async updateMedia(id: number, dto: updateMediaDto) {
+    const media = await this.getMediaById(id);
 
-    Object.assign(media, dto);
+    const { detail, ...mediaRest } = dto;
 
-    return media;
+    await this.mediaRepository.update({ id }, mediaRest);
+
+    if (detail) {
+      await this.mediadetailRepository.update(
+        {
+          id: media.detail.id,
+        },
+        { detail },
+      );
+    }
+
+    const newMedia = await this.getMediaById(id);
+
+    return newMedia;
   }
 
-  deleteMedia(id: number) {
-    const mediaIndex = this.medias.findIndex((media) => media.id === id);
-    if (mediaIndex === -1)
-      throw new NotFoundException('존재하지 않는 ID입니다.');
+  async deleteMedia(id: number) {
+    const media = await this.getMediaById(id);
 
-    this.medias.splice(mediaIndex, 1);
-
+    await this.mediaRepository.delete(id);
+    await this.mediadetailRepository.delete(media.detail.id);
     return id;
   }
 }

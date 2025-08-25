@@ -9,4 +9,9 @@ export class updateMediaDto {
   @IsNotEmpty()
   @IsOptional()
   genre?: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @IsOptional()
+  detail?: string;
 }
