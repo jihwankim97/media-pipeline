@@ -1,14 +1,9 @@
-import {
-  Column,
-  CreateDateColumn,
-  Entity,
-  PrimaryGeneratedColumn,
-  UpdateDateColumn,
-  VersionColumn,
-} from 'typeorm';
+import { Column, Entity, OneToOne, PrimaryGeneratedColumn } from 'typeorm';
+import { BaseTable } from './base-table.entity';
+import { MediaDetail } from './media.detail.entity';
 
 @Entity()
-export class Media {
+export class Media extends BaseTable {
   @PrimaryGeneratedColumn()
   id: number;
 
@@ -18,12 +13,6 @@ export class Media {
   @Column()
   genre: string;
 
-  @CreateDateColumn()
-  createdAt: Date;
-
-  @UpdateDateColumn()
-  updatedAt: Date;
-
-  @VersionColumn()
-  version: number;
+  @OneToOne(() => MediaDetail, (detail) => detail.media)
+  detail: MediaDetail;
 }

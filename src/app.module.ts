@@ -6,6 +6,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import * as Joi from 'joi';
 import { Media } from './media/entity/media.entity';
+import { MediaDetail } from './media/entity/media.detail.entity';
 @Module({
   imports: [
     MediaModule,
@@ -28,7 +29,7 @@ import { Media } from './media/entity/media.entity';
         username: configService.get<string>('DB_USERNAME'),
         password: configService.get<string>('DB_PASSWORD'),
         database: configService.get<string>('DB_DATABASE'),
-        entities: [Media],
+        entities: [Media, MediaDetail],
         synchronize: true,
       }),
       inject: [ConfigService],
