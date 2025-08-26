@@ -40,13 +40,10 @@ export class MediaService {
   }
 
   async createMedia(dto: createMediaDto) {
-    const mediaDetail = await this.mediadetailRepository.save({
-      detail: dto.detail,
-    });
     const media = await this.mediaRepository.save({
       title: dto.title,
       genre: dto.genre,
-      detail: mediaDetail,
+      detail: { detail: dto.detail },
     });
     return media;
   }
@@ -56,20 +53,15 @@ export class MediaService {
 
     const { detail, ...mediaRest } = dto;
 
-    await this.mediaRepository.update({ id }, mediaRest);
-
-    if (detail) {
-      await this.mediadetailRepository.update(
-        {
-          id: media.detail.id,
-        },
-        { detail },
-      );
+    if (Object.keys(mediaRest).length > 0) {
+      Object.assign(media, mediaRest);
     }
 
-    const newMedia = await this.getMediaById(id);
+    if (detail) {
+      media.detail.detail = detail;
+    }
 
-    return newMedia;
+    return await this.mediaRepository.save(media);
   }
 
   async deleteMedia(id: number) {

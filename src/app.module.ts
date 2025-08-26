@@ -7,6 +7,8 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import * as Joi from 'joi';
 import { Media } from './media/entity/media.entity';
 import { MediaDetail } from './media/entity/media.detail.entity';
+import { DirectorModule } from './director/director.module';
+import { Director } from './director/entity/director.entity';
 @Module({
   imports: [
     MediaModule,
@@ -29,11 +31,12 @@ import { MediaDetail } from './media/entity/media.detail.entity';
         username: configService.get<string>('DB_USERNAME'),
         password: configService.get<string>('DB_PASSWORD'),
         database: configService.get<string>('DB_DATABASE'),
-        entities: [Media, MediaDetail],
+        entities: [Media, MediaDetail, Director],
         synchronize: true,
       }),
       inject: [ConfigService],
     }),
+    DirectorModule,
     // TypeOrmModule.forRoot({
     //   type: process.env.DB_TYPE as 'postgres',
     //   host: process.env.DB_HOST,
