@@ -1,4 +1,11 @@
-import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import {
+  ArrayNotEmpty,
+  IsArray,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString,
+} from 'class-validator';
 
 export class updateMediaDto {
   @IsString()
@@ -6,13 +13,19 @@ export class updateMediaDto {
   @IsOptional()
   title?: string;
 
-  @IsString()
-  @IsNotEmpty()
+  @IsArray()
+  @ArrayNotEmpty()
   @IsOptional()
-  genre?: string;
+  @IsNumber({}, { each: true })
+  genreIds?: string[];
 
   @IsString()
   @IsNotEmpty()
   @IsOptional()
   detail?: string;
+
+  @IsNotEmpty()
+  @IsNumber()
+  @IsOptional()
+  directorId?: number;
 }

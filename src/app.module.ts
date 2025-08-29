@@ -9,6 +9,8 @@ import { Media } from './media/entity/media.entity';
 import { MediaDetail } from './media/entity/media.detail.entity';
 import { DirectorModule } from './director/director.module';
 import { Director } from './director/entity/director.entity';
+import { GenreModule } from './genre/genre.module';
+import { Genre } from './genre/entities/genre.entity';
 @Module({
   imports: [
     MediaModule,
@@ -31,22 +33,13 @@ import { Director } from './director/entity/director.entity';
         username: configService.get<string>('DB_USERNAME'),
         password: configService.get<string>('DB_PASSWORD'),
         database: configService.get<string>('DB_DATABASE'),
-        entities: [Media, MediaDetail, Director],
+        entities: [Media, MediaDetail, Director, Genre],
         synchronize: true,
       }),
       inject: [ConfigService],
     }),
     DirectorModule,
-    // TypeOrmModule.forRoot({
-    //   type: process.env.DB_TYPE as 'postgres',
-    //   host: process.env.DB_HOST,
-    //   port: Number(process.env.DB_PORT),
-    //   username: process.env.DB_USERNAME,
-    //   password: process.env.DB_PASSWORD,
-    //   database: process.env.DB_DATABASE,
-    //   entities: [],
-    //   synchronize: true,
-    // }),
+    GenreModule,
   ],
   controllers: [AppController],
   providers: [AppService],
