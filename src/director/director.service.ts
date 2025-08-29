@@ -12,12 +12,20 @@ export class DirectorService {
     private readonly directorRepository: Repository<Director>,
   ) {}
 
+  async validateExists(id: number) {
+    const isExists = await this.directorRepository.exists({ where: { id } });
+
+    if (!isExists) {
+      throw new NotFoundException('존재하지 않는 ID의 director입니다.');
+    }
+  }
+
   async create(createDirectorDto: CreateDirectorDto) {
     return this.directorRepository.save(createDirectorDto);
   }
 
-  findAll() {
-    return this.directorRepository.find();
+  async findAll() {
+    return await this.directorRepository.find();
   }
 
   async findOne(id: number) {
