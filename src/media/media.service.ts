@@ -92,7 +92,7 @@ export class MediaService {
 
     if (genreIds && genreIds.length > 0) {
       const genres = await this.genreRepository.find({
-        where: { id: In(genreIds.map((id) => parseInt(id))) },
+        where: { id: In(genreIds.map((id) => id)) },
       });
 
       if (genres.length !== genreIds.length) {

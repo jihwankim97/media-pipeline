@@ -14,7 +14,7 @@ export class createMediaDto {
   @ArrayNotEmpty()
   @IsArray()
   @IsNumber({}, { each: true })
-  genreIds: string[];
+  genreIds: number[];
 
   @IsNotEmpty()
   @IsString()
