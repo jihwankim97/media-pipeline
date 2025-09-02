@@ -1,31 +1,4 @@
-import {
-  ArrayNotEmpty,
-  IsArray,
-  IsNotEmpty,
-  IsNumber,
-  IsOptional,
-  IsString,
-} from 'class-validator';
+import { createMediaDto } from './create-media.dto';
+import { PartialType } from '@nestjs/mapped-types';
 
-export class updateMediaDto {
-  @IsString()
-  @IsNotEmpty()
-  @IsOptional()
-  title?: string;
-
-  @IsArray()
-  @ArrayNotEmpty()
-  @IsOptional()
-  @IsNumber({}, { each: true })
-  genreIds?: string[];
-
-  @IsString()
-  @IsNotEmpty()
-  @IsOptional()
-  detail?: string;
-
-  @IsNotEmpty()
-  @IsNumber()
-  @IsOptional()
-  directorId?: number;
-}
+export class updateMediaDto extends PartialType(createMediaDto) {}
