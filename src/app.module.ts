@@ -11,6 +11,9 @@ import { DirectorModule } from './director/director.module';
 import { Director } from './director/entity/director.entity';
 import { GenreModule } from './genre/genre.module';
 import { Genre } from './genre/entities/genre.entity';
+import { AuthModule } from './auth/auth.module';
+import { UserModule } from './user/user.module';
+import { User } from './user/entities/user.entity';
 @Module({
   imports: [
     MediaModule,
@@ -23,6 +26,7 @@ import { Genre } from './genre/entities/genre.entity';
         DB_PORT: Joi.number().required(),
         DB_PASSWORD: Joi.string().required(),
         DB_DATABASE: Joi.string().required(),
+        HASH_ROUNDS: Joi.number().required(),
       }),
     }),
     TypeOrmModule.forRootAsync({
@@ -33,13 +37,25 @@ import { Genre } from './genre/entities/genre.entity';
         username: configService.get<string>('DB_USERNAME'),
         password: configService.get<string>('DB_PASSWORD'),
         database: configService.get<string>('DB_DATABASE'),
-        entities: [Media, MediaDetail, Director, Genre],
+        entities: [Media, MediaDetail, Director, Genre, User],
         synchronize: true,
       }),
       inject: [ConfigService],
     }),
     DirectorModule,
     GenreModule,
+    AuthModule,
+    UserModule,
+    // TypeOrmModule.forRoot({
+    //   type: process.env.DB_TYPE as 'postgres',
+    //   host: process.env.DB_HOST,
+    //   port: Number(process.env.DB_PORT),
+    //   username: process.env.DB_USERNAME,
+    //   password: process.env.DB_PASSWORD,
+    //   database: process.env.DB_DATABASE,
+    //   entities: [],
+    //   synchronize: true,
+    // }),
   ],
   controllers: [AppController],
   providers: [AppService],
