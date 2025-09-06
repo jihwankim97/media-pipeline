@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { User } from 'src/user/entities/user.entity';
 import { Repository } from 'typeorm';
@@ -56,20 +60,26 @@ export class AuthService {
       throw new BadRequestException('토큰 포멧이 잘못되었습니다.');
     }
 
-    const payload = await this.jwtService.verifyAsync<JwtPayload>(token, {
-      secret: this.configService.get<string>('ACCESS_TOKEN_SECRET'),
-    });
+    try {
+      const payload = await this.jwtService.verifyAsync<JwtPayload>(token, {
+        secret: this.configService.get<string>(
+          isRefreshToken ? 'REFRESH_TOKEN_SECRET' : 'ACCESS_TOKEN_SECRET',
+        ),
+      });
 
-    if (isRefreshToken) {
-      if (payload.type !== 'refresh') {
-        throw new BadRequestException('Refresh 토큰을 입력해주세요');
+      if (isRefreshToken) {
+        if (payload.type !== 'refresh') {
+          throw new BadRequestException('Refresh 토큰을 입력해주세요');
+        }
+      } else {
+        if (payload.type !== 'access')
+          throw new BadRequestException('Access 토큰을 입력해주세요');
       }
-    } else {
-      if (payload.type !== 'access')
-        throw new BadRequestException('Access 토큰을 입력해주세요');
-    }
 
-    return payload;
+      return payload;
+    } catch {
+      throw new UnauthorizedException('토큰이 만료되었습니다.');
+    }
   }
 
   async register(rawToken: string) {
@@ -113,7 +123,7 @@ export class AuthService {
     return user;
   }
 
-  async issueToken(user: User, isRefreshToken: boolean) {
+  async issueToken(payload: JwtPayload | User, isRefreshToken: boolean) {
     const refreshTokenSecret = this.configService.get<string>(
       'REFRESH_TOKEN_SECRET',
     );
@@ -121,31 +131,12 @@ export class AuthService {
       'ACCESS_TOKEN_SECRET',
     );
 
+    const sub = 'id' in payload ? payload.id : payload.sub;
+    const role = payload.role;
     return await this.jwtService.signAsync(
       {
-        sub: user.id,
-        role: user.role,
-        type: isRefreshToken ? 'refresh' : 'access',
-      },
-      {
-        secret: isRefreshToken ? refreshTokenSecret : accessTokenSecret,
-        expiresIn: isRefreshToken ? '24h' : 300,
-      },
-    );
-  }
-
-  async issueTokenFromPayload(payload: JwtPayload, isRefreshToken: boolean) {
-    const refreshTokenSecret = this.configService.get<string>(
-      'REFRESH_TOKEN_SECRET',
-    );
-    const accessTokenSecret = this.configService.get<string>(
-      'ACCESS_TOKEN_SECRET',
-    );
-
-    return await this.jwtService.signAsync(
-      {
-        sub: payload.sub,
-        role: payload.role,
+        sub,
+        role,
         type: isRefreshToken ? 'refresh' : 'access',
       },
       {
