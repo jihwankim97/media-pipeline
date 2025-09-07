@@ -3,11 +3,13 @@ import { updateMediaDto } from './dto/update-media.dto';
 import { createMediaDto } from './dto/create-media.dto';
 import { Media } from './entity/media.entity';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Like, Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { MediaDetail } from './entity/media.detail.entity';
 import { DirectorService } from 'src/director/director.service';
 import { Genre } from 'src/genre/entities/genre.entity';
 import { Director } from 'src/director/entity/director.entity';
+import { GetMediasDto } from './dto/get-medias.dto';
+import { CommonService } from '../common/common.service';
 
 @Injectable()
 export class MediaService {
@@ -19,6 +21,8 @@ export class MediaService {
     private readonly directorService: DirectorService,
     @InjectRepository(Genre)
     private readonly genreRepository: Repository<Genre>,
+
+    private readonly commonService: CommonService,
   ) {}
 
   async validateExists(id: number) {
@@ -29,19 +33,21 @@ export class MediaService {
     }
   }
 
-  async findAll(title?: string) {
-    if (!title) {
-      return this.mediaRepository.findAndCount({
-        relations: ['detail', 'director', 'genres'],
-      });
+  async findAll(dto: GetMediasDto) {
+    const { title } = dto;
+
+    const qb = this.mediaRepository
+      .createQueryBuilder('media')
+      .leftJoinAndSelect('media.director', 'director')
+      .leftJoinAndSelect('media.genres', 'genres');
+
+    if (title) {
+      qb.where('media.title LIKE :title', { title: `%${title}%` });
     }
 
-    return this.mediaRepository.findAndCount({
-      where: {
-        title: Like(`%${title}%`),
-      },
-      relations: ['detail', 'director', 'genres'],
-    });
+    this.commonService.applyCursorPaginationParamsToQb(qb, dto);
+
+    return await qb.getManyAndCount();
   }
 
   async findOne(id: number) {
@@ -56,6 +62,14 @@ export class MediaService {
 
   async create(dto: createMediaDto) {
     await this.directorService.validateExists(dto.directorId);
+
+    const isTitleExists = await this.mediaRepository.exists({
+      where: { title: dto.title },
+    });
+
+    if (isTitleExists) {
+      throw new NotFoundException('이미 존재하는 title입니다.');
+    }
 
     const genres = await this.genreRepository.find({
       where: { id: In(dto.genreIds) },

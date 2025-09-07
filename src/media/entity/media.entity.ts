@@ -30,6 +30,9 @@ export class Media extends BaseTable {
   @JoinTable()
   genres: Genre[];
 
+  @Column({ default: 0 })
+  likeCount: number;
+
   @OneToOne(() => MediaDetail, (detail) => detail.media, {
     cascade: true,
     nullable: false,
