@@ -8,16 +8,16 @@ import {
   ParseIntPipe,
   Patch,
   Post,
-  Query,
   UseInterceptors,
 } from '@nestjs/common';
 import { MediaService } from './media.service';
 import { createMediaDto } from './dto/create-media.dto';
 import { updateMediaDto } from './dto/update-media.dto';
-import { MediaTitleValidationPile } from './pipe/media-title-validation.pipe';
 import { Public } from 'src/auth/decorator /public.decorator';
 import { RBAC } from 'src/auth/decorator /rbac.decorator';
 import { Role } from 'src/user/entities/user.entity';
+import { GetMediasDto } from './dto/get-medias.dto';
+import { Query } from '@nestjs/common';
 
 @Controller('medias')
 @UseInterceptors(ClassSerializerInterceptor)
@@ -26,8 +26,8 @@ export class MediaController {
 
   @Get()
   @Public()
-  async getMedias(@Query('title', MediaTitleValidationPile) title?: string) {
-    return await this.mediaService.findAll(title);
+  async getMedias(@Query() dto: GetMediasDto) {
+    return await this.mediaService.findAll(dto);
   }
 
   @Get('/:id')

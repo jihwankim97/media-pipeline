@@ -24,6 +24,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { APP_GUARD } from '@nestjs/core';
 import { AuthGuard } from './auth/guard/auth.guard';
 import { RBACGuard } from './auth/guard/rbac.guard';
+import { CommonModule } from './common/common.module';
 @Module({
   imports: [
     MediaModule,
@@ -59,6 +60,7 @@ import { RBACGuard } from './auth/guard/rbac.guard';
     AuthModule,
     UserModule,
     JwtModule,
+    CommonModule,
   ],
   controllers: [AppController],
   providers: [
