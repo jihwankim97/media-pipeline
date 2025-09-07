@@ -29,7 +29,7 @@ export class MediaService {
     }
   }
 
-  async findAll(title: string) {
+  async findAll(title?: string) {
     if (!title) {
       return this.mediaRepository.findAndCount({
         relations: ['detail', 'director', 'genres'],

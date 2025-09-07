@@ -21,6 +21,9 @@ import { UserModule } from './user/user.module';
 import { User } from './user/entities/user.entity';
 import { BearerTokenMiddleware } from './auth/middleware/bearer-token.middleware';
 import { JwtModule } from '@nestjs/jwt';
+import { APP_GUARD } from '@nestjs/core';
+import { AuthGuard } from './auth/guard/auth.guard';
+import { RBACGuard } from './auth/guard/rbac.guard';
 @Module({
   imports: [
     MediaModule,
@@ -58,7 +61,17 @@ import { JwtModule } from '@nestjs/jwt';
     JwtModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    {
+      provide: APP_GUARD,
+      useClass: AuthGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: RBACGuard,
+    },
+  ],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
