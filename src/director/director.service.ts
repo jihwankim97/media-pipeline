@@ -1,0 +1,62 @@
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { CreateDirectorDto } from './dto/create-director.dto';
+import { UpdateDirectorDto } from './dto/update-director.dto';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Director } from './entity/director.entity';
+import { Repository } from 'typeorm';
+
+@Injectable()
+export class DirectorService {
+  constructor(
+    @InjectRepository(Director)
+    private readonly directorRepository: Repository<Director>,
+  ) {}
+
+  async validateExists(id: number) {
+    const isExists = await this.directorRepository.exists({ where: { id } });
+
+    if (!isExists) {
+      throw new NotFoundException('존재하지 않는 ID의 director입니다.');
+    }
+  }
+
+  async create(createDirectorDto: CreateDirectorDto) {
+    return this.directorRepository.save(createDirectorDto);
+  }
+
+  async findAll() {
+    return await this.directorRepository.find();
+  }
+
+  async findOne(id: number) {
+    const director = await this.directorRepository.findOne({
+      where: { id },
+    });
+
+    if (!director) {
+      throw new NotFoundException(`존재하지 않는 ID의 director입니다.`);
+    }
+
+    return director;
+  }
+
+  async update(id: number, updateDirectorDto: UpdateDirectorDto) {
+    const result = await this.directorRepository.update(id, updateDirectorDto);
+
+    if (result.affected === 0) {
+      throw new NotFoundException(`존재하지 않는 ID의 director입니다.`);
+    }
+
+    return await this.findOne(id);
+  }
+
+  async remove(id: number) {
+    const result = await this.directorRepository.delete(id);
+
+    if (result.affected === 0) {
+      throw new NotFoundException(`존재하지 않는 ID의 director입니다.`);
+    }
+
+    return id;
+  }
+}
