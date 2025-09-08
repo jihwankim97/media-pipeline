@@ -10,7 +10,7 @@ import {
 import { AuthService } from './auth.service';
 import { LocalAuthGuard } from './strategy/local.strategy';
 import { RequestWithUser } from './types/request.types';
-import { Public } from './decorator /public.decorator';
+import { Public } from './decorator/public.decorator';
 
 @UseInterceptors(ClassSerializerInterceptor)
 @Controller('auth')

@@ -45,9 +45,16 @@ export class MediaService {
       qb.where('media.title LIKE :title', { title: `%${title}%` });
     }
 
-    this.commonService.applyCursorPaginationParamsToQb(qb, dto);
+    const { nextCursor } =
+      await this.commonService.applyCursorPaginationParamsToQb(qb, dto);
 
-    return await qb.getManyAndCount();
+    const [data, count] = await qb.getManyAndCount();
+
+    return {
+      data,
+      nextCursor,
+      count,
+    };
   }
 
   async findOne(id: number) {

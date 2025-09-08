@@ -13,8 +13,8 @@ import {
 import { MediaService } from './media.service';
 import { createMediaDto } from './dto/create-media.dto';
 import { updateMediaDto } from './dto/update-media.dto';
-import { Public } from 'src/auth/decorator /public.decorator';
-import { RBAC } from 'src/auth/decorator /rbac.decorator';
+import { Public } from 'src/auth/decorator/public.decorator';
+import { RBAC } from 'src/auth/decorator/rbac.decorator';
 import { Role } from 'src/user/entities/user.entity';
 import { GetMediasDto } from './dto/get-medias.dto';
 import { Query } from '@nestjs/common';
@@ -27,6 +27,7 @@ export class MediaController {
   @Get()
   @Public()
   async getMedias(@Query() dto: GetMediasDto) {
+    console.log('DTO TAKE:', dto.take);
     return await this.mediaService.findAll(dto);
   }
 
