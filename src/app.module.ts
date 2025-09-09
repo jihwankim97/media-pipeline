@@ -28,6 +28,9 @@ import { CommonModule } from './common/common.module';
 import { ResponseTimeInterceptor } from './common/interceptor/response-time.interceptor';
 import { ForbiddenExceptionFilter } from './common/filter/forbidden.filter';
 import { QueryExeptionFilter } from './common/filter/query-faild.filter';
+import { ServeStaticModule } from '@nestjs/serve-static';
+import { join } from 'path';
+
 @Module({
   imports: [
     MediaModule,
@@ -57,6 +60,10 @@ import { QueryExeptionFilter } from './common/filter/query-faild.filter';
         synchronize: true,
       }),
       inject: [ConfigService],
+    }),
+    ServeStaticModule.forRoot({
+      rootPath: join(process.cwd(), 'public'),
+      serveRoot: '/public/',
     }),
     DirectorModule,
     GenreModule,
