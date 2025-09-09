@@ -10,6 +10,8 @@ import { Genre } from 'src/genre/entities/genre.entity';
 import { Director } from 'src/director/entity/director.entity';
 import { GetMediasDto } from './dto/get-medias.dto';
 import { CommonService } from '../common/common.service';
+import { join } from 'path';
+import { rename } from 'fs/promises';
 
 @Injectable()
 export class MediaService {
@@ -88,11 +90,20 @@ export class MediaService {
       );
     }
 
+    const mediaFolder = join('public', 'media');
+
+    const tempFolder = join('public', 'temp');
+
+    await rename(
+      join(process.cwd(), tempFolder, dto.mediaFileName),
+      join(mediaFolder, dto.mediaFileName),
+    );
     const media = await this.mediaRepository.save({
       title: dto.title,
       genres: genres,
       detail: { detail: dto.detail },
       director: { id: dto.directorId },
+      mediaFilePath: join(mediaFolder, dto.mediaFileName),
     });
     return media;
   }

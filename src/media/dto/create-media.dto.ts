@@ -1,3 +1,4 @@
+import { Type } from 'class-transformer';
 import {
   ArrayNotEmpty,
   IsArray,
@@ -14,6 +15,7 @@ export class createMediaDto {
   @ArrayNotEmpty()
   @IsArray()
   @IsNumber({}, { each: true })
+  @Type(() => Number)
   genreIds: number[];
 
   @IsNotEmpty()
@@ -23,4 +25,7 @@ export class createMediaDto {
   @IsNotEmpty()
   @IsNumber()
   directorId: number;
+
+  @IsString()
+  mediaFileName: string;
 }

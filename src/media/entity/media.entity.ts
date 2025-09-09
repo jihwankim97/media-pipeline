@@ -12,6 +12,7 @@ import { BaseTable } from 'src/common/entity/base-table.entity';
 import { MediaDetail } from './media.detail.entity';
 import { Director } from 'src/director/entity/director.entity';
 import { Genre } from 'src/genre/entities/genre.entity';
+import { Transform } from 'class-transformer';
 
 @Entity()
 export class Media extends BaseTable {
@@ -39,6 +40,10 @@ export class Media extends BaseTable {
   })
   @JoinColumn()
   detail: MediaDetail;
+
+  @Column()
+  @Transform(({ value }) => `http://localhost:3000/${value}`)
+  mediaFilePath: string;
 
   @ManyToOne(() => Director, (director) => director.medias, {
     cascade: true,
