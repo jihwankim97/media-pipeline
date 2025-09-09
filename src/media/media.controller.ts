@@ -27,7 +27,6 @@ export class MediaController {
   @Get()
   @Public()
   async getMedias(@Query() dto: GetMediasDto) {
-    console.log('DTO TAKE:', dto.take);
     return await this.mediaService.findAll(dto);
   }
 
