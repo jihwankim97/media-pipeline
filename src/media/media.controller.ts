@@ -8,6 +8,7 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Request,
   UseInterceptors,
 } from '@nestjs/common';
 import { MediaService } from './media.service';
@@ -18,6 +19,8 @@ import { RBAC } from 'src/auth/decorator/rbac.decorator';
 import { Role } from 'src/user/entities/user.entity';
 import { GetMediasDto } from './dto/get-medias.dto';
 import { Query } from '@nestjs/common';
+import { TransactionInterceptor } from 'src/common/interceptor/transaction.interceptor';
+import { QueryRunner } from 'typeorm';
 
 @Controller('medias')
 @UseInterceptors(ClassSerializerInterceptor)
@@ -38,17 +41,20 @@ export class MediaController {
 
   @Post()
   @RBAC(Role.admin)
-  postMedia(@Body() dto: createMediaDto) {
-    return this.mediaService.create(dto);
+  @UseInterceptors(TransactionInterceptor)
+  postMedia(@Body() dto: createMediaDto, @Request() req: any) {
+    return this.mediaService.create(dto, req.queryRunner as QueryRunner);
   }
 
   @Patch('/:id')
   @RBAC(Role.admin)
+  @UseInterceptors(TransactionInterceptor)
   patchMedia(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: updateMediaDto,
+    @Request() req: any,
   ) {
-    return this.mediaService.update(id, dto);
+    return this.mediaService.update(id, dto, req.queryRunner as QueryRunner);
   }
 
   @Delete('/:id')
