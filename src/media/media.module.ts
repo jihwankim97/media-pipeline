@@ -8,10 +8,11 @@ import { DirectorModule } from 'src/director/director.module';
 import { GenreModule } from 'src/genre/genre.module';
 import { Genre } from 'src/genre/entities/genre.entity';
 import { CommonModule } from 'src/common/common.module';
+import { Director } from 'src/director/entity/director.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Media, MediaDetail, Genre]),
+    TypeOrmModule.forFeature([Media, MediaDetail, Genre, Director]),
     DirectorModule,
     GenreModule,
     CommonModule,

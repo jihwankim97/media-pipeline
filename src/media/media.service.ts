@@ -3,7 +3,7 @@ import { updateMediaDto } from './dto/update-media.dto';
 import { createMediaDto } from './dto/create-media.dto';
 import { Media } from './entity/media.entity';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { DataSource, In, QueryRunner, Repository } from 'typeorm';
 import { MediaDetail } from './entity/media.detail.entity';
 import { DirectorService } from 'src/director/director.service';
 import { Genre } from 'src/genre/entities/genre.entity';
@@ -23,7 +23,9 @@ export class MediaService {
     private readonly directorService: DirectorService,
     @InjectRepository(Genre)
     private readonly genreRepository: Repository<Genre>,
-
+    @InjectRepository(Director)
+    private readonly directorRepository: Repository<Director>,
+    private readonly dataSource: DataSource,
     private readonly commonService: CommonService,
   ) {}
 
@@ -69,10 +71,15 @@ export class MediaService {
     return media;
   }
 
-  async create(dto: createMediaDto) {
-    await this.directorService.validateExists(dto.directorId);
+  async create(dto: createMediaDto, qr: QueryRunner) {
+    const isDirectorExists = await qr.manager.exists(Director, {
+      where: { id: dto.directorId },
+    });
+    if (!isDirectorExists) {
+      throw new NotFoundException('존재하지 않는 director ID입니다.');
+    }
 
-    const isTitleExists = await this.mediaRepository.exists({
+    const isTitleExists = await qr.manager.exists(Media, {
       where: { title: dto.title },
     });
 
@@ -80,7 +87,7 @@ export class MediaService {
       throw new NotFoundException('이미 존재하는 title입니다.');
     }
 
-    const genres = await this.genreRepository.find({
+    const genres = await qr.manager.find(Genre, {
       where: { id: In(dto.genreIds) },
     });
 
@@ -96,20 +103,26 @@ export class MediaService {
 
     await rename(
       join(process.cwd(), tempFolder, dto.mediaFileName),
-      join(mediaFolder, dto.mediaFileName),
+      join(process.cwd(), mediaFolder, dto.mediaFileName),
     );
-    const media = await this.mediaRepository.save({
+
+    const media = await qr.manager.save(Media, {
       title: dto.title,
       genres: genres,
       detail: { detail: dto.detail },
       director: { id: dto.directorId },
       mediaFilePath: join(mediaFolder, dto.mediaFileName),
     });
+
     return media;
   }
 
-  async update(id: number, dto: updateMediaDto) {
-    const media = await this.findOne(id);
+  async update(id: number, dto: updateMediaDto, qr: QueryRunner) {
+    let media = await qr.manager.findOne(Media, {
+      where: { id },
+      relations: ['detail', 'director', 'genres'],
+    });
+    if (!media) throw new NotFoundException('존재하지 않는 ID입니다.');
 
     const { detail, directorId, genreIds, ...mediaRest } = dto;
 
@@ -118,12 +131,18 @@ export class MediaService {
     }
 
     if (directorId) {
-      await this.directorService.validateExists(directorId);
+      const isDirectorExists = await qr.manager.exists(Director, {
+        where: { id: dto.directorId },
+      });
+
+      if (!isDirectorExists) {
+        throw new NotFoundException('존재하지 않는 director ID입니다.');
+      }
       media.director = { id: directorId } as Director;
     }
 
     if (genreIds && genreIds.length > 0) {
-      const genres = await this.genreRepository.find({
+      const genres = await qr.manager.find(Genre, {
         where: { id: In(genreIds.map((id) => id)) },
       });
 
@@ -139,7 +158,10 @@ export class MediaService {
     if (Object.keys(mediaRest).length > 0) {
       Object.assign(media, mediaRest);
     }
-    return await this.mediaRepository.save(media);
+
+    media = await qr.manager.save(Media, media);
+
+    return media;
   }
 
   async remove(id: number) {
