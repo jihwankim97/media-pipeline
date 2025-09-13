@@ -22,7 +22,7 @@ export class TransactionInterceptor implements NestInterceptor {
     await qr.connect();
     await qr.startTransaction();
 
-    (req as any).queryRunner = qr;
+    req.queryRunner = qr;
 
     return next.handle().pipe(
       catchError((e) => {

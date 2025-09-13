@@ -13,11 +13,15 @@ import { MediaDetail } from './media.detail.entity';
 import { Director } from 'src/director/entity/director.entity';
 import { Genre } from 'src/genre/entities/genre.entity';
 import { Transform } from 'class-transformer';
+import { User } from 'src/user/entities/user.entity';
 
 @Entity()
 export class Media extends BaseTable {
   @PrimaryGeneratedColumn()
   id: number;
+
+  @ManyToOne(() => User, (user) => user.medias)
+  creator: User;
 
   @Column({
     unique: true,
