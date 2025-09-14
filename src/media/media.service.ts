@@ -64,14 +64,14 @@ export class MediaService {
   async findOne(id: number) {
     const media = await this.mediaRepository.findOne({
       where: { id },
-      relations: ['detail', 'director', 'genres'],
+      relations: ['detail', 'director', 'genres', 'creator'],
     });
     if (!media) throw new NotFoundException('존재하지 않는 ID입니다.');
 
     return media;
   }
 
-  async create(dto: createMediaDto, qr: QueryRunner) {
+  async create(dto: createMediaDto, qr: QueryRunner, userId: number) {
     const isDirectorExists = await qr.manager.exists(Director, {
       where: { id: dto.directorId },
     });
@@ -101,19 +101,19 @@ export class MediaService {
 
     const tempFolder = join('public', 'temp');
 
-    await rename(
-      join(process.cwd(), tempFolder, dto.mediaFileName),
-      join(process.cwd(), mediaFolder, dto.mediaFileName),
-    );
-
     const media = await qr.manager.save(Media, {
       title: dto.title,
       genres: genres,
       detail: { detail: dto.detail },
       director: { id: dto.directorId },
       mediaFilePath: join(mediaFolder, dto.mediaFileName),
+      creator: { id: userId },
     });
 
+    await rename(
+      join(process.cwd(), tempFolder, dto.mediaFileName),
+      join(process.cwd(), mediaFolder, dto.mediaFileName),
+    );
     return media;
   }
 

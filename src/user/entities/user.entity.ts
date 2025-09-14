@@ -32,4 +32,5 @@ export class User extends BaseTable {
 
   @OneToMany(() => MediaUserLike, (mul) => mul.user)
   likedMedias: MediaUserLike[];
+
 }

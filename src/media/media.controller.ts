@@ -8,7 +8,6 @@ import {
   ParseIntPipe,
   Patch,
   Post,
-  Request,
   UseInterceptors,
 } from '@nestjs/common';
 import { MediaService } from './media.service';
@@ -20,7 +19,8 @@ import { Role } from 'src/user/entities/user.entity';
 import { GetMediasDto } from './dto/get-medias.dto';
 import { Query } from '@nestjs/common';
 import { TransactionInterceptor } from 'src/common/interceptor/transaction.interceptor';
-import { QueryRunner } from 'typeorm';
+import { UserId } from 'src/user/decorator/user-id.decorator';
+import { QueryRunner } from 'src/common/drcorator/query-runner.decorator';
 
 @Controller('medias')
 @UseInterceptors(ClassSerializerInterceptor)
@@ -42,8 +42,12 @@ export class MediaController {
   @Post()
   @RBAC(Role.admin)
   @UseInterceptors(TransactionInterceptor)
-  postMedia(@Body() dto: createMediaDto, @Request() req: any) {
-    return this.mediaService.create(dto, req.queryRunner as QueryRunner);
+  postMedia(
+    @Body() dto: createMediaDto,
+    @QueryRunner() qr,
+    @UserId() userId: number,
+  ) {
+    return this.mediaService.create(dto, qr, userId);
   }
 
   @Patch('/:id')
@@ -52,9 +56,9 @@ export class MediaController {
   patchMedia(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: updateMediaDto,
-    @Request() req: any,
+    @QueryRunner() qr,
   ) {
-    return this.mediaService.update(id, dto, req.queryRunner as QueryRunner);
+    return this.mediaService.update(id, dto, qr);
   }
 
   @Delete('/:id')

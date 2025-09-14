@@ -13,7 +13,7 @@ export class CommonController {
   @UseInterceptors(
     FileInterceptor('video', {
       limits: {
-        fileSize: 2000000,
+        fileSize: 50 * 1024 * 1024,
       },
       fileFilter(req, file, cllback) {
         if (file.mimetype !== 'video/mp4') {
@@ -30,7 +30,6 @@ export class CommonController {
     @UploadedFile()
     media: Express.Multer.File,
   ) {
-    console.log(media);
     return {
       fileName: media.filename,
     };
