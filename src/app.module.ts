@@ -30,6 +30,7 @@ import { ForbiddenExceptionFilter } from './common/filter/forbidden.filter';
 import { QueryExeptionFilter } from './common/filter/query-faild.filter';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
+import { MediaUserLike } from './media/entity/media-user-like.entity';
 
 @Module({
   imports: [
@@ -56,7 +57,7 @@ import { join } from 'path';
         username: configService.get<string>('DB_USERNAME'),
         password: configService.get<string>('DB_PASSWORD'),
         database: configService.get<string>('DB_DATABASE'),
-        entities: [Media, MediaDetail, Director, Genre, User],
+        entities: [Media, MediaDetail, Director, Genre, User, MediaUserLike],
         synchronize: true,
       }),
       inject: [ConfigService],

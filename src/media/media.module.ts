@@ -9,10 +9,17 @@ import { GenreModule } from 'src/genre/genre.module';
 import { Genre } from 'src/genre/entities/genre.entity';
 import { CommonModule } from 'src/common/common.module';
 import { Director } from 'src/director/entity/director.entity';
+import { MediaUserLike } from './entity/media-user-like.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Media, MediaDetail, Genre, Director]),
+    TypeOrmModule.forFeature([
+      Media,
+      MediaDetail,
+      Genre,
+      Director,
+      MediaUserLike,
+    ]),
     DirectorModule,
     GenreModule,
     CommonModule,

@@ -1,6 +1,8 @@
 import { Exclude } from 'class-transformer';
 import { BaseTable } from 'src/common/entity/base-table.entity';
-import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+import { MediaUserLike } from 'src/media/entity/media-user-like.entity';
+import { Media } from 'src/media/entity/media.entity';
+import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 
 export enum Role {
   admin,
@@ -24,4 +26,10 @@ export class User extends BaseTable {
 
   @Column({ enum: Role, default: Role.user })
   role: Role;
+
+  @OneToMany(() => Media, (media) => media.creator)
+  medias: Media[];
+
+  @OneToMany(() => MediaUserLike, (mul) => mul.user)
+  likedMedias: MediaUserLike[];
 }
