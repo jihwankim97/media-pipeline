@@ -5,6 +5,7 @@ import {
   JoinTable,
   ManyToMany,
   ManyToOne,
+  OneToMany,
   OneToOne,
   PrimaryGeneratedColumn,
 } from 'typeorm';
@@ -14,6 +15,7 @@ import { Director } from 'src/director/entity/director.entity';
 import { Genre } from 'src/genre/entities/genre.entity';
 import { Transform } from 'class-transformer';
 import { User } from 'src/user/entities/user.entity';
+import { MediaUserLike } from './media-user-like.entity';
 
 @Entity()
 export class Media extends BaseTable {
@@ -55,4 +57,7 @@ export class Media extends BaseTable {
   })
   @JoinColumn()
   director: Director;
+
+  @OneToMany(() => MediaUserLike, (mul) => mul.media)
+  likedUsers: MediaUserLike[];
 }

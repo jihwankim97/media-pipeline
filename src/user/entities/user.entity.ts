@@ -1,5 +1,6 @@
 import { Exclude } from 'class-transformer';
 import { BaseTable } from 'src/common/entity/base-table.entity';
+import { MediaUserLike } from 'src/media/entity/media-user-like.entity';
 import { Media } from 'src/media/entity/media.entity';
 import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 
@@ -28,4 +29,8 @@ export class User extends BaseTable {
 
   @OneToMany(() => Media, (media) => media.creator)
   medias: Media[];
+
+  @OneToMany(() => MediaUserLike, (mul) => mul.user)
+  likedMedias: MediaUserLike[];
+
 }
