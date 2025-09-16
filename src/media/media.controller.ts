@@ -29,8 +29,8 @@ export class MediaController {
 
   @Get()
   @Public()
-  async getMedias(@Query() dto: GetMediasDto) {
-    return await this.mediaService.findAll(dto);
+  async getMedias(@Query() dto: GetMediasDto, @UserId() userId?: number) {
+    return await this.mediaService.findAll(dto, userId);
   }
 
   @Get('/:id')
@@ -65,5 +65,21 @@ export class MediaController {
   @RBAC(Role.admin)
   deleteMedia(@Param('id', ParseIntPipe) id: number) {
     return this.mediaService.remove(id);
+  }
+
+  @Post('/:id/like')
+  createMediaLike(
+    @Param('id', ParseIntPipe) mediaId: number,
+    @UserId() userId: number,
+  ) {
+    return this.mediaService.toggleMediaLike(mediaId, userId, true);
+  }
+
+  @Post('/:id/dislike')
+  createMediaDisLike(
+    @Param('id', ParseIntPipe) mediaId: number,
+    @UserId() userId: number,
+  ) {
+    return this.mediaService.toggleMediaLike(mediaId, userId, false);
   }
 }
