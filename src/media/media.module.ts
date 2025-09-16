@@ -10,6 +10,7 @@ import { Genre } from 'src/genre/entities/genre.entity';
 import { CommonModule } from 'src/common/common.module';
 import { Director } from 'src/director/entity/director.entity';
 import { MediaUserLike } from './entity/media-user-like.entity';
+import { User } from 'src/user/entities/user.entity';
 
 @Module({
   imports: [
@@ -18,6 +19,8 @@ import { MediaUserLike } from './entity/media-user-like.entity';
       MediaDetail,
       Genre,
       Director,
+      MediaUserLike,
+      User,
       MediaUserLike,
     ]),
     DirectorModule,

@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { updateMediaDto } from './dto/update-media.dto';
 import { createMediaDto } from './dto/create-media.dto';
 import { Media } from './entity/media.entity';
@@ -12,6 +17,8 @@ import { GetMediasDto } from './dto/get-medias.dto';
 import { CommonService } from '../common/common.service';
 import { join } from 'path';
 import { rename } from 'fs/promises';
+import { User } from 'src/user/entities/user.entity';
+import { MediaUserLike } from './entity/media-user-like.entity';
 
 @Injectable()
 export class MediaService {
@@ -25,6 +32,10 @@ export class MediaService {
     private readonly genreRepository: Repository<Genre>,
     @InjectRepository(Director)
     private readonly directorRepository: Repository<Director>,
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
+    @InjectRepository(MediaUserLike)
+    private readonly mediaUserLikeRepository: Repository<MediaUserLike>,
     private readonly dataSource: DataSource,
     private readonly commonService: CommonService,
   ) {}
@@ -37,7 +48,7 @@ export class MediaService {
     }
   }
 
-  async findAll(dto: GetMediasDto) {
+  async findAll(dto: GetMediasDto, userId?: number) {
     const { title } = dto;
 
     const qb = this.mediaRepository
@@ -52,7 +63,34 @@ export class MediaService {
     const { nextCursor } =
       await this.commonService.applyCursorPaginationParamsToQb(qb, dto);
 
-    const [data, count] = await qb.getManyAndCount();
+    let [data, count] = await qb.getManyAndCount();
+
+    if (userId) {
+      const mediaIds = data.map((media) => media.id);
+      const likedMedias =
+        mediaIds.length < 1
+          ? []
+          : await this.mediaUserLikeRepository
+              .createQueryBuilder('mul')
+              .leftJoinAndSelect('mul.user', 'user')
+              .leftJoinAndSelect('mul.media', 'media')
+              .where('media.id In(:...mediaIds)', { mediaIds })
+              .andWhere('user.id = :userId', { userId })
+              .getMany();
+
+      const likedMediaMap = likedMedias.reduce(
+        (acc, next) => ({
+          ...acc,
+          [next.media.id]: next.isLike,
+        }),
+        {} as Record<number, boolean>,
+      );
+
+      data = data.map((x) => ({
+        ...x,
+        likeStatus: x.id in likedMediaMap ? likedMediaMap[x.id] : null,
+      }));
+    }
 
     return {
       data,
@@ -170,5 +208,57 @@ export class MediaService {
     await this.mediaRepository.delete(id);
     await this.mediadetailRepository.delete(media.detail.id);
     return id;
+  }
+
+  async toggleMediaLike(mediaId: number, userId: number, isLike: boolean) {
+    const media = await this.mediaRepository.findOne({
+      where: { id: mediaId },
+    });
+
+    if (!media) {
+      throw new BadRequestException('존재하지 않는 미디어입니다.');
+    }
+
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('존재하지 않는 유저입니다.');
+    }
+
+    const likeRecord = await this.mediaUserLikeRepository
+      .createQueryBuilder('mul')
+      .leftJoinAndSelect('mul.media', 'media')
+      .leftJoinAndSelect('mul.user', 'user')
+      .where('media.id = :mediaId', { mediaId })
+      .andWhere('user.id = :userId', { userId })
+      .getOne();
+
+    if (likeRecord) {
+      if (isLike === likeRecord.isLike) {
+        await this.mediaUserLikeRepository.delete({ media, user });
+      } else {
+        await this.mediaUserLikeRepository.update({ media, user }, { isLike });
+      }
+    } else {
+      await this.mediaUserLikeRepository.save({
+        media,
+        user,
+        isLike,
+      });
+    }
+
+    const result = await this.mediaUserLikeRepository
+      .createQueryBuilder('mul')
+      .leftJoinAndSelect('mul.media', 'media')
+      .leftJoinAndSelect('mul.user', 'user')
+      .where('media.id = :mediaId', { mediaId })
+      .andWhere('user.id = :userId', { userId })
+      .getOne();
+
+    return {
+      isLike: result && result.isLike,
+    };
   }
 }
