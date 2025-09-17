@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  Inject,
   Injectable,
   NotFoundException,
   UnauthorizedException,
@@ -19,6 +20,7 @@ import { join } from 'path';
 import { rename } from 'fs/promises';
 import { User } from 'src/user/entities/user.entity';
 import { MediaUserLike } from './entity/media-user-like.entity';
+import { CACHE_MANAGER, Cache } from '@nestjs/cache-manager';
 
 @Injectable()
 export class MediaService {
@@ -38,7 +40,26 @@ export class MediaService {
     private readonly mediaUserLikeRepository: Repository<MediaUserLike>,
     private readonly dataSource: DataSource,
     private readonly commonService: CommonService,
+    @Inject(CACHE_MANAGER)
+    private readonly cacheManager: Cache,
   ) {}
+
+  async findRecent() {
+    const cacheData = await this.cacheManager.get('MEDIA_RECENT');
+
+    if (cacheData) {
+      return cacheData;
+    }
+
+    const data = await this.mediaRepository.find({
+      order: { createdAt: 'DESC' },
+      take: 10,
+    });
+
+    await this.cacheManager.set('MEDIA_RECENT', data);
+
+    return data;
+  }
 
   async validateExists(id: number) {
     const isExists = await this.mediaRepository.exists({ where: { id } });

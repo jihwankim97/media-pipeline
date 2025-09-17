@@ -31,6 +31,8 @@ import { QueryExeptionFilter } from './common/filter/query-faild.filter';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
 import { MediaUserLike } from './media/entity/media-user-like.entity';
+import { CacheModule } from '@nestjs/cache-manager';
+import { ThrottleInterceptor } from './common/interceptor/throttle.interceptor';
 
 @Module({
   imports: [
@@ -66,6 +68,7 @@ import { MediaUserLike } from './media/entity/media-user-like.entity';
       rootPath: join(process.cwd(), 'public'),
       serveRoot: '/public/',
     }),
+    CacheModule.register({ ttl: 3000, isGlobal: true }),
     DirectorModule,
     GenreModule,
     AuthModule,
@@ -88,13 +91,17 @@ import { MediaUserLike } from './media/entity/media-user-like.entity';
       provide: APP_INTERCEPTOR,
       useClass: ResponseTimeInterceptor,
     },
-    {
-      provide: APP_FILTER,
-      useClass: ForbiddenExceptionFilter,
-    },
+    // {
+    //   provide: APP_FILTER,
+    //   useClass: ForbiddenExceptionFilter,
+    // },
     {
       provide: APP_FILTER,
       useClass: QueryExeptionFilter,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: ThrottleInterceptor,
     },
   ],
 })

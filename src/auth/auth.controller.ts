@@ -6,11 +6,14 @@ import {
   UseInterceptors,
   Request,
   UseGuards,
+  Body,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LocalAuthGuard } from './strategy/local.strategy';
 import { RequestWithUser } from './types/request.types';
 import { Public } from './decorator/public.decorator';
+import { RBAC } from './decorator/rbac.decorator';
+import { Role } from 'src/user/entities/user.entity';
 
 @UseInterceptors(ClassSerializerInterceptor)
 @Controller('auth')
@@ -27,6 +30,12 @@ export class AuthController {
   @Post('login')
   loginUser(@Headers('authorization') token: string) {
     return this.authService.login(token);
+  }
+
+  @RBAC(Role.admin)
+  @Post('token/block')
+  blockToken(@Body('token') token: string) {
+    return this.authService.tokenBlock(token);
   }
 
   @Post('token/access')

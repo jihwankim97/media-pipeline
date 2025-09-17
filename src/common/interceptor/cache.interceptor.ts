@@ -9,7 +9,7 @@ import { Observable, of, tap } from 'rxjs';
 import { RequestWithUser } from 'src/auth/types/request.types';
 
 @Injectable()
-export class ChacheInterceptor implements NestInterceptor {
+export class CacheInterceptor implements NestInterceptor {
   private cache = new Map<string, any>();
 
   intercept(
