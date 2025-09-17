@@ -20,7 +20,13 @@ import { GetMediasDto } from './dto/get-medias.dto';
 import { Query } from '@nestjs/common';
 import { TransactionInterceptor } from 'src/common/interceptor/transaction.interceptor';
 import { UserId } from 'src/user/decorator/user-id.decorator';
-import { QueryRunner } from 'src/common/drcorator/query-runner.decorator';
+import { QueryRunner } from 'src/common/decorator/query-runner.decorator';
+import {
+  CacheKey,
+  CacheTTL,
+  CacheInterceptor as CI,
+} from '@nestjs/cache-manager';
+import { Throttle } from 'src/common/decorator/throttle.decorator';
 
 @Controller('medias')
 @UseInterceptors(ClassSerializerInterceptor)
@@ -29,8 +35,20 @@ export class MediaController {
 
   @Get()
   @Public()
+  @Throttle({
+    count: 5,
+    unit: 'minute',
+  })
   async getMedias(@Query() dto: GetMediasDto, @UserId() userId?: number) {
     return await this.mediaService.findAll(dto, userId);
+  }
+
+  @Get('recent')
+  @UseInterceptors(CI)
+  @CacheKey('getMediaRecent')
+  @CacheTTL(0)
+  getMediasRecent() {
+    return this.mediaService.findRecent();
   }
 
   @Get('/:id')
