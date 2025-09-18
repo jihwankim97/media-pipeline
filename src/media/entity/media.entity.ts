@@ -40,6 +40,9 @@ export class Media extends BaseTable {
   @Column({ default: 0 })
   likeCount: number;
 
+  @Column({ default: 0 })
+  disLikeCount: number;
+
   @OneToOne(() => MediaDetail, (detail) => detail.media, {
     cascade: true,
     nullable: false,

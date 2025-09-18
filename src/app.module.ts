@@ -33,6 +33,7 @@ import { join } from 'path';
 import { MediaUserLike } from './media/entity/media-user-like.entity';
 import { CacheModule } from '@nestjs/cache-manager';
 import { ThrottleInterceptor } from './common/interceptor/throttle.interceptor';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
@@ -75,6 +76,7 @@ import { ThrottleInterceptor } from './common/interceptor/throttle.interceptor';
     UserModule,
     JwtModule,
     CommonModule,
+    ScheduleModule.forRoot(),
   ],
   controllers: [AppController],
   providers: [

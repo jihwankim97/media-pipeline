@@ -5,6 +5,7 @@ import { MulterModule } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { join } from 'path';
 import { randomUUID } from 'crypto';
+import { TasksService } from './tasks.service';
 
 @Module({
   imports: [
@@ -25,7 +26,7 @@ import { randomUUID } from 'crypto';
     }),
   ],
   controllers: [CommonController],
-  providers: [CommonService],
+  providers: [CommonService, TasksService],
   exports: [CommonService],
 })
 export class CommonModule {}
