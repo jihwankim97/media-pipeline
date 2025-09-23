@@ -27,8 +27,10 @@ import {
   CacheInterceptor as CI,
 } from '@nestjs/cache-manager';
 import { Throttle } from 'src/common/decorator/throttle.decorator';
+import { ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 
 @Controller('medias')
+@ApiBearerAuth()
 @UseInterceptors(ClassSerializerInterceptor)
 export class MediaController {
   constructor(private readonly mediaService: MediaService) {}
@@ -38,6 +40,17 @@ export class MediaController {
   @Throttle({
     count: 5,
     unit: 'minute',
+  })
+  @ApiOperation({
+    description: '[Media]를 페이지네이션 하는 api',
+  })
+  @ApiResponse({
+    status: 200,
+    description: '성공적으로 api를 실행 했을때',
+  })
+  @ApiResponse({
+    status: 400,
+    description: '잘못 api를 실행 했을때',
   })
   async getMedias(@Query() dto: GetMediasDto, @UserId() userId?: number) {
     return await this.mediaService.findAll(dto, userId);
