@@ -51,8 +51,14 @@ export class UserService {
   }
 
   async remove(id: number) {
-    await this.validateExists(id);
+    const user = await this.userRepository.findOne({ where: { id } });
 
-    return await this.userRepository.delete(id);
+    if (!user) {
+      throw new NotFoundException(`아이디가 ${id}인 유저가 없습니다.`);
+    }
+
+    await this.userRepository.delete(id);
+
+    return id;
   }
 }
