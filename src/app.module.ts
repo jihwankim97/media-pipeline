@@ -62,6 +62,9 @@ import { ScheduleModule } from '@nestjs/schedule';
         database: configService.get<string>('DB_DATABASE'),
         entities: [Media, MediaDetail, Director, Genre, User, MediaUserLike],
         synchronize: true,
+        ssl: {
+          rejectUnauthorized: false,
+        },
       }),
       inject: [ConfigService],
     }),
