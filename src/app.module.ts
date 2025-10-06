@@ -26,7 +26,6 @@ import { AuthGuard } from './auth/guard/auth.guard';
 import { RBACGuard } from './auth/guard/rbac.guard';
 import { CommonModule } from './common/common.module';
 import { ResponseTimeInterceptor } from './common/interceptor/response-time.interceptor';
-import { ForbiddenExceptionFilter } from './common/filter/forbidden.filter';
 import { QueryExeptionFilter } from './common/filter/query-faild.filter';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
@@ -50,6 +49,9 @@ import { ScheduleModule } from '@nestjs/schedule';
         HASH_ROUNDS: Joi.number().required(),
         ACCESS_TOKEN_SECRET: Joi.string().required(),
         REFRESH_TOKEN_SECRET: Joi.string().required(),
+        AWS_ACCESS_KEY_ID: Joi.string().required(),
+        AWS_SECRET_ACCESS_KEY: Joi.string().required(),
+        AWS_REGION: Joi.string().required(),
       }),
     }),
     TypeOrmModule.forRootAsync({
@@ -61,10 +63,13 @@ import { ScheduleModule } from '@nestjs/schedule';
         password: configService.get<string>('DB_PASSWORD'),
         database: configService.get<string>('DB_DATABASE'),
         entities: [Media, MediaDetail, Director, Genre, User, MediaUserLike],
-        synchronize: true,
-        ssl: {
-          rejectUnauthorized: false,
-        },
+        synchronize: configService.get<string>('ENV') === 'prod' ? false : true,
+        ssl:
+          configService.get<string>('ENV') === 'prod'
+            ? {
+                rejectUnauthorized: false,
+              }
+            : false,
       }),
       inject: [ConfigService],
     }),

@@ -1,11 +1,67 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import { ObjectLiteral, SelectQueryBuilder } from 'typeorm';
 import { PagePaginationDto } from './dto/page-paginatioon.dto';
 import { CursorPaginationDto } from './dto/cursor-pagination.dto';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { ObjectCannedACL, PutObjectCommand, S3 } from '@aws-sdk/client-s3';
+import { randomUUID } from 'crypto';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class CommonService {
-  constructor() {}
+  private readonly s3: S3;
+  constructor(private readonly configService: ConfigService) {
+    this.s3 = new S3({
+      credentials: {
+        accessKeyId: this.configService.get('AWS_ACCESS_KEY_ID')!,
+        secretAccessKey: this.configService.get('AWS_SECRET_ACCESS_KEY')!,
+      },
+
+      region: this.configService.get('AWS_REGION')!,
+    });
+  }
+
+  async saveMediaToPermanentStorage(mediaFileName: string) {
+    try {
+      const bucketName = this.configService.get('AWS_S3_BUCKET_NAME')!;
+      await this.s3.copyObject({
+        Bucket: bucketName,
+        CopySource: `${bucketName}/public/temp/${mediaFileName}`,
+        Key: `public/media/${mediaFileName}`,
+        ACL: 'public-read',
+      });
+
+      await this.s3.deleteObject({
+        Bucket: bucketName,
+        Key: `public/temp/${mediaFileName}`,
+      });
+    } catch {
+      throw new InternalServerErrorException(
+        'Failed to save media to permanent storage',
+      );
+    }
+  }
+
+  async createPresignedURL(expiresIn = 300) {
+    const params = {
+      Bucket: this.configService.get('AWS_S3_BUCKET_NAME')!,
+      Key: `public/temp/${randomUUID()}.mp4`,
+      ACL: ObjectCannedACL.public_read,
+    };
+
+    try {
+      const url = await getSignedUrl(this.s3, new PutObjectCommand(params), {
+        expiresIn,
+      });
+      return url;
+    } catch {
+      throw new InternalServerErrorException('Failed to create presigned URL');
+    }
+  }
 
   applyPagePaginationParamsToQb<T extends ObjectLiteral>(
     qb: SelectQueryBuilder<T>,
