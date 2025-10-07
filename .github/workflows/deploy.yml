@@ -26,7 +26,17 @@ jobs:
         run: npm run build
 
       - name: Zip Artifact For Deployment
-        run: zip -r deploy.zip .
+        run: |
+          zip -r deploy.zip . \
+            -x "node_modules/*" \
+            -x ".git/*" \
+            -x ".github/*" \
+            -x "*.log" \
+            -x ".env*" \
+            -x "postgres-data/*" \
+            -x "public/*" \
+            -x "test/*" \
+            -x "*.md"
 
       - name: Upload To S3
         env:
@@ -44,10 +54,11 @@ jobs:
           AWS_REGION: ${{secrets.AWS_REGION}}
         run: |
           aws elasticbeanstalk create-application-version \
-            --application-name "Media-Pipeline-EB-2"
+            --application-name "Media-Pipeline-EB-2" \
             --version-label $GITHUB_SHA \
             --source-bundle S3Bucket="media-pipeline-bucket",S3Key="deploy.zip"
 
           aws elasticbeanstalk update-environment \
-            --application-name "Media-Pipeline-EB-2"
-            --environment-name "Media-Pipeline-EB-2-env"
+            --application-name "Media-Pipeline-EB-2" \
+            --environment-name "Media-Pipeline-EB-2-env" \
+            --version-label $GITHUB_SHA
