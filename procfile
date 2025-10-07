@@ -1,1 +1,1 @@
-web: node dist/main.js
+web: npm install --production && node dist/main.js
