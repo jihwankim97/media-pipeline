@@ -21,10 +21,19 @@ import { UserModule } from './user/user.module';
 import { User } from './user/entities/user.entity';
 import { BearerTokenMiddleware } from './auth/middleware/bearer-token.middleware';
 import { JwtModule } from '@nestjs/jwt';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { AuthGuard } from './auth/guard/auth.guard';
 import { RBACGuard } from './auth/guard/rbac.guard';
 import { CommonModule } from './common/common.module';
+import { ResponseTimeInterceptor } from './common/interceptor/response-time.interceptor';
+import { QueryExeptionFilter } from './common/filter/query-faild.filter';
+import { ServeStaticModule } from '@nestjs/serve-static';
+import { join } from 'path';
+import { MediaUserLike } from './media/entity/media-user-like.entity';
+import { CacheModule } from '@nestjs/cache-manager';
+import { ThrottleInterceptor } from './common/interceptor/throttle.interceptor';
+import { ScheduleModule } from '@nestjs/schedule';
+
 @Module({
   imports: [
     MediaModule,
@@ -40,6 +49,9 @@ import { CommonModule } from './common/common.module';
         HASH_ROUNDS: Joi.number().required(),
         ACCESS_TOKEN_SECRET: Joi.string().required(),
         REFRESH_TOKEN_SECRET: Joi.string().required(),
+        AWS_ACCESS_KEY_ID: Joi.string().required(),
+        AWS_SECRET_ACCESS_KEY: Joi.string().required(),
+        AWS_REGION: Joi.string().required(),
       }),
     }),
     TypeOrmModule.forRootAsync({
@@ -50,17 +62,29 @@ import { CommonModule } from './common/common.module';
         username: configService.get<string>('DB_USERNAME'),
         password: configService.get<string>('DB_PASSWORD'),
         database: configService.get<string>('DB_DATABASE'),
-        entities: [Media, MediaDetail, Director, Genre, User],
-        synchronize: true,
+        entities: [Media, MediaDetail, Director, Genre, User, MediaUserLike],
+        synchronize: configService.get<string>('ENV') === 'prod' ? false : true,
+        ssl:
+          configService.get<string>('ENV') === 'prod'
+            ? {
+                rejectUnauthorized: false,
+              }
+            : false,
       }),
       inject: [ConfigService],
     }),
+    ServeStaticModule.forRoot({
+      rootPath: join(process.cwd(), 'public'),
+      serveRoot: '/public/',
+    }),
+    CacheModule.register({ ttl: 3000, isGlobal: true }),
     DirectorModule,
     GenreModule,
     AuthModule,
     UserModule,
     JwtModule,
     CommonModule,
+    ScheduleModule.forRoot(),
   ],
   controllers: [AppController],
   providers: [
@@ -72,6 +96,22 @@ import { CommonModule } from './common/common.module';
     {
       provide: APP_GUARD,
       useClass: RBACGuard,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: ResponseTimeInterceptor,
+    },
+    // {
+    //   provide: APP_FILTER,
+    //   useClass: ForbiddenExceptionFilter,
+    // },
+    {
+      provide: APP_FILTER,
+      useClass: QueryExeptionFilter,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: ThrottleInterceptor,
     },
   ],
 })

@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  Inject,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -10,13 +11,35 @@ import * as bcrypt from 'bcrypt';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { JwtPayload } from './types/jwt.types';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Cache } from 'cache-manager';
+import { UserService } from 'src/user/user.service';
 @Injectable()
 export class AuthService {
   constructor(
     @InjectRepository(User) private readonly userRepository: Repository<User>,
     private readonly configService: ConfigService,
     private readonly jwtService: JwtService,
+    @Inject(CACHE_MANAGER)
+    private readonly cacheManager: Cache,
+    private readonly userService: UserService,
   ) {}
+
+  async tokenBlock(token: string) {
+    const payload = this.jwtService.decode<JwtPayload>(token);
+
+    const expiryDate = +new Date(payload['exp'] * 1000);
+    const now = +Date.now();
+    const differenceInSeconds = expiryDate - now / 1000;
+
+    await this.cacheManager.set(
+      `BLOCK_TOKEN_${token}`,
+      payload,
+      Math.max(differenceInSeconds * 1000, 1),
+    );
+
+    return true;
+  }
 
   parseBasicToken(rawToken: string) {
     const basicSplit = rawToken.split(' ');
@@ -85,24 +108,7 @@ export class AuthService {
   async register(rawToken: string) {
     const { email, password } = this.parseBasicToken(rawToken);
 
-    const user = await this.userRepository.findOne({
-      where: { email },
-    });
-
-    if (user) {
-      throw new BadRequestException('이미 가입한 이메일 입니다.');
-    }
-
-    const hashRounds = this.configService.get<number>('HASH_ROUNDS');
-    if (!hashRounds) {
-      throw new Error('HASH_ROUNDS 환경 변수가 설정되지 않았습니다.');
-    }
-
-    const hashedPassword = await bcrypt.hash(password, hashRounds);
-
-    await this.userRepository.save({ email, password: hashedPassword });
-
-    return this.userRepository.findOne({ where: { email } });
+    return await this.userService.create({ email, password });
   }
 
   async authenticate(email: string, password: string) {

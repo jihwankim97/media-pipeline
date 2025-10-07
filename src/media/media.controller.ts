@@ -13,21 +13,55 @@ import {
 import { MediaService } from './media.service';
 import { createMediaDto } from './dto/create-media.dto';
 import { updateMediaDto } from './dto/update-media.dto';
-import { Public } from 'src/auth/decorator /public.decorator';
-import { RBAC } from 'src/auth/decorator /rbac.decorator';
+import { Public } from 'src/auth/decorator/public.decorator';
+import { RBAC } from 'src/auth/decorator/rbac.decorator';
 import { Role } from 'src/user/entities/user.entity';
 import { GetMediasDto } from './dto/get-medias.dto';
 import { Query } from '@nestjs/common';
+import { TransactionInterceptor } from 'src/common/interceptor/transaction.interceptor';
+import { UserId } from 'src/user/decorator/user-id.decorator';
+import { QueryRunner } from 'src/common/decorator/query-runner.decorator';
+import {
+  CacheKey,
+  CacheTTL,
+  CacheInterceptor as CI,
+} from '@nestjs/cache-manager';
+import { Throttle } from 'src/common/decorator/throttle.decorator';
+import { ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 
 @Controller('medias')
+@ApiBearerAuth()
 @UseInterceptors(ClassSerializerInterceptor)
 export class MediaController {
   constructor(private readonly mediaService: MediaService) {}
 
   @Get()
   @Public()
-  async getMedias(@Query() dto: GetMediasDto) {
-    return await this.mediaService.findAll(dto);
+  @Throttle({
+    count: 5,
+    unit: 'minute',
+  })
+  @ApiOperation({
+    description: '[Media]를 페이지네이션 하는 api',
+  })
+  @ApiResponse({
+    status: 200,
+    description: '성공적으로 api를 실행 했을때',
+  })
+  @ApiResponse({
+    status: 400,
+    description: '잘못 api를 실행 했을때',
+  })
+  async getMedias(@Query() dto: GetMediasDto, @UserId() userId?: number) {
+    return await this.mediaService.findAll(dto, userId);
+  }
+
+  @Get('recent')
+  @UseInterceptors(CI)
+  @CacheKey('getMediaRecent')
+  @CacheTTL(0)
+  getMediasRecent() {
+    return this.mediaService.findRecent();
   }
 
   @Get('/:id')
@@ -38,22 +72,45 @@ export class MediaController {
 
   @Post()
   @RBAC(Role.admin)
-  postMedia(@Body() dto: createMediaDto) {
-    return this.mediaService.create(dto);
+  @UseInterceptors(TransactionInterceptor)
+  postMedia(
+    @Body() dto: createMediaDto,
+    @QueryRunner() qr,
+    @UserId() userId: number,
+  ) {
+    return this.mediaService.create(dto, qr, userId);
   }
 
   @Patch('/:id')
   @RBAC(Role.admin)
+  @UseInterceptors(TransactionInterceptor)
   patchMedia(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: updateMediaDto,
+    @QueryRunner() qr,
   ) {
-    return this.mediaService.update(id, dto);
+    return this.mediaService.update(id, dto, qr);
   }
 
   @Delete('/:id')
   @RBAC(Role.admin)
   deleteMedia(@Param('id', ParseIntPipe) id: number) {
     return this.mediaService.remove(id);
+  }
+
+  @Post('/:id/like')
+  createMediaLike(
+    @Param('id', ParseIntPipe) mediaId: number,
+    @UserId() userId: number,
+  ) {
+    return this.mediaService.toggleMediaLike(mediaId, userId, true);
+  }
+
+  @Post('/:id/dislike')
+  createMediaDisLike(
+    @Param('id', ParseIntPipe) mediaId: number,
+    @UserId() userId: number,
+  ) {
+    return this.mediaService.toggleMediaLike(mediaId, userId, false);
   }
 }
