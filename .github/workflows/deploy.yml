@@ -36,7 +36,7 @@ jobs:
             -x "postgres-data/*" \
             -x "public/*" \
             -x "test/*" \
-            -x "*.md"
+            -x "README.md"
 
       - name: Upload To S3
         env:
