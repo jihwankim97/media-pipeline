@@ -6,6 +6,7 @@ import { diskStorage } from 'multer';
 import { join } from 'path';
 import { randomUUID } from 'crypto';
 import { TasksService } from './tasks.service';
+import { BullModule } from '@nestjs/bullmq';
 
 @Module({
   imports: [
@@ -23,6 +24,15 @@ import { TasksService } from './tasks.service';
           callback(null, `${randomUUID()}_${Date.now()}.${extension}`);
         },
       }),
+    }),
+    BullModule.forRoot({
+      connection: {
+        host: process.env.REDIS_HOST || 'localhost',
+        port: parseInt(process.env.REDIS_PORT || '6379'),
+      },
+    }),
+    BullModule.registerQueue({
+      name: 'thumbnail-generation',
     }),
   ],
   controllers: [CommonController],
