@@ -8,7 +8,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { MediaModule } from './media/media.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ConditionalModule, ConfigModule, ConfigService } from '@nestjs/config';
 import * as Joi from 'joi';
 import { Media } from './media/entity/media.entity';
 import { MediaDetail } from './media/entity/media.detail.entity';
@@ -33,6 +33,7 @@ import { MediaUserLike } from './media/entity/media-user-like.entity';
 import { CacheModule } from '@nestjs/cache-manager';
 import { ThrottleInterceptor } from './common/interceptor/throttle.interceptor';
 import { ScheduleModule } from '@nestjs/schedule';
+import { WorkerModul } from './worker/worker.module';
 
 @Module({
   imports: [
@@ -85,6 +86,11 @@ import { ScheduleModule } from '@nestjs/schedule';
     JwtModule,
     CommonModule,
     ScheduleModule.forRoot(),
+    WorkerModul,
+    ConditionalModule.registerWhen(
+      WorkerModul,
+      (env: NodeJS.ProcessEnv) => env['TYPE'] === 'worker',
+    ),
   ],
   controllers: [AppController],
   providers: [
