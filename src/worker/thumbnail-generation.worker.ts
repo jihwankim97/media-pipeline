@@ -9,8 +9,6 @@ export class ThumbnailGenerationProcess extends WorkerHost {
   async process(job: Job, token?: string): Promise<any> {
     const { videoId, videoPath } = job.data;
 
-    console.log(job.data);
-
     const outputDirectory = join(cwd(), 'public', 'thumbnail');
 
     ffmpegFluent(videoPath)

@@ -15,12 +15,10 @@ import { createMediaDto } from './dto/create-media.dto';
 import { updateMediaDto } from './dto/update-media.dto';
 import { Public } from 'src/auth/decorator/public.decorator';
 import { RBAC } from 'src/auth/decorator/rbac.decorator';
-import { Role } from 'src/user/entities/user.entity';
 import { GetMediasDto } from './dto/get-medias.dto';
 import { Query } from '@nestjs/common';
-import { TransactionInterceptor } from 'src/common/interceptor/transaction.interceptor';
 import { UserId } from 'src/user/decorator/user-id.decorator';
-import { QueryRunner } from 'src/common/decorator/query-runner.decorator';
+
 import {
   CacheKey,
   CacheTTL,
@@ -28,6 +26,7 @@ import {
 } from '@nestjs/cache-manager';
 import { Throttle } from 'src/common/decorator/throttle.decorator';
 import { ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { Role } from '@prisma/client';
 
 @Controller('medias')
 @ApiBearerAuth()
@@ -72,24 +71,17 @@ export class MediaController {
 
   @Post()
   @RBAC(Role.admin)
-  @UseInterceptors(TransactionInterceptor)
-  postMedia(
-    @Body() dto: createMediaDto,
-    @QueryRunner() qr,
-    @UserId() userId: number,
-  ) {
-    return this.mediaService.create(dto, qr, userId);
+  postMedia(@Body() dto: createMediaDto, @UserId() userId: number) {
+    return this.mediaService.create(dto, userId);
   }
 
   @Patch('/:id')
   @RBAC(Role.admin)
-  @UseInterceptors(TransactionInterceptor)
   patchMedia(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: updateMediaDto,
-    @QueryRunner() qr,
   ) {
-    return this.mediaService.update(id, dto, qr);
+    return this.mediaService.update(id, dto);
   }
 
   @Delete('/:id')

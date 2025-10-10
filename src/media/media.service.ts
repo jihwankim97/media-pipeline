@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Inject,
   Injectable,
   NotFoundException,
@@ -7,44 +8,25 @@ import {
 } from '@nestjs/common';
 import { updateMediaDto } from './dto/update-media.dto';
 import { createMediaDto } from './dto/create-media.dto';
-import { Media } from './entity/media.entity';
-import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, In, QueryRunner, Repository } from 'typeorm';
-import { MediaDetail } from './entity/media.detail.entity';
-import { DirectorService } from 'src/director/director.service';
-import { Genre } from 'src/genre/entities/genre.entity';
-import { Director } from 'src/director/entity/director.entity';
 import { GetMediasDto } from './dto/get-medias.dto';
 import { CommonService } from '../common/common.service';
 import { join } from 'path';
 import { rename } from 'fs/promises';
-import { User } from 'src/user/entities/user.entity';
-import { MediaUserLike } from './entity/media-user-like.entity';
 import { CACHE_MANAGER, Cache } from '@nestjs/cache-manager';
 import { ConfigService } from '@nestjs/config';
+import { PrismaService } from 'src/common/prisma.service';
+import { PrismaErrorHandlerService } from 'src/common/prisma-error-handler.service';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class MediaService {
   constructor(
-    @InjectRepository(Media)
-    private readonly mediaRepository: Repository<Media>,
-    @InjectRepository(MediaDetail)
-    private readonly mediadetailRepository: Repository<MediaDetail>,
-    private readonly directorService: DirectorService,
-    @InjectRepository(Genre)
-    private readonly genreRepository: Repository<Genre>,
-    @InjectRepository(Director)
-    private readonly directorRepository: Repository<Director>,
-    @InjectRepository(User)
-    private readonly userRepository: Repository<User>,
-    @InjectRepository(MediaUserLike)
-    private readonly mediaUserLikeRepository: Repository<MediaUserLike>,
-    private readonly dataSource: DataSource,
     private readonly commonService: CommonService,
     @Inject(CACHE_MANAGER)
     private readonly cacheManager: Cache,
-
     private readonly configService: ConfigService,
+    private readonly prisma: PrismaService,
+    private readonly prismaErrorHandler: PrismaErrorHandlerService,
   ) {}
 
   async findRecent() {
@@ -54,8 +36,8 @@ export class MediaService {
       return cacheData;
     }
 
-    const data = await this.mediaRepository.find({
-      order: { createdAt: 'DESC' },
+    const data = await this.prisma.media.findMany({
+      orderBy: { createdAt: 'desc' },
       take: 10,
     });
 
@@ -64,43 +46,53 @@ export class MediaService {
     return data;
   }
 
-  async validateExists(id: number) {
-    const isExists = await this.mediaRepository.exists({ where: { id } });
-
-    if (!isExists) {
-      throw new NotFoundException('존재하지 않는 ID의 media입니다.');
-    }
-  }
-
   async findAll(dto: GetMediasDto, userId?: number) {
-    const { title } = dto;
+    const { title, cursor, take, order } = dto;
 
-    const qb = this.mediaRepository
-      .createQueryBuilder('media')
-      .leftJoinAndSelect('media.director', 'director')
-      .leftJoinAndSelect('media.genres', 'genres');
+    const orderBy = order.map((field) => {
+      const [column, direction] = field.split('_');
 
-    if (title) {
-      qb.where('media.title LIKE :title', { title: `%${title}%` });
+      return { [column]: direction.toLocaleLowerCase() };
+    });
+
+    const queryOptions: any = {
+      where: title ? { title: { contains: title } } : {},
+      take: take + 1,
+      skip: cursor ? 1 : 0,
+      orderBy: orderBy,
+      include: { genres: true, director: true },
+    };
+
+    if (cursor) {
+      const cursorId = parseInt(cursor);
+      if (!isNaN(cursorId)) {
+        queryOptions.cursor = { id: cursorId };
+      }
     }
 
-    const { nextCursor } =
-      await this.commonService.applyCursorPaginationParamsToQb(qb, dto);
+    const medias = await this.prisma.media.findMany(queryOptions);
 
-    let [data, count] = await qb.getManyAndCount();
+    const hasNextPage = medias.length > take;
+    if (hasNextPage) medias.pop();
+
+    const nextCursor = hasNextPage
+      ? medias[medias.length - 1].id.toString()
+      : null;
 
     if (userId) {
-      const mediaIds = data.map((media) => media.id);
+      const mediaIds = medias.map((media) => media.id);
       const likedMedias =
         mediaIds.length < 1
           ? []
-          : await this.mediaUserLikeRepository
-              .createQueryBuilder('mul')
-              .leftJoinAndSelect('mul.user', 'user')
-              .leftJoinAndSelect('mul.media', 'media')
-              .where('media.id In(:...mediaIds)', { mediaIds })
-              .andWhere('user.id = :userId', { userId })
-              .getMany();
+          : await this.prisma.mediaUserLike.findMany({
+              where: {
+                mediaId: { in: mediaIds },
+                userId,
+              },
+              include: {
+                media: true,
+              },
+            });
 
       const likedMediaMap = likedMedias.reduce(
         (acc, next) => ({
@@ -110,23 +102,33 @@ export class MediaService {
         {} as Record<number, boolean>,
       );
 
-      data = data.map((x) => ({
-        ...x,
-        likeStatus: x.id in likedMediaMap ? likedMediaMap[x.id] : null,
-      }));
+      return {
+        data: medias.map((media) => ({
+          ...media,
+          likeStatus:
+            media.id in likedMediaMap ? likedMediaMap[media.id] : null,
+        })),
+        nextCursor,
+        hasNextPage,
+      };
     }
 
     return {
-      data,
+      data: medias,
       nextCursor,
-      count,
+      hasNextPage,
     };
   }
 
   async findOne(id: number) {
-    const media = await this.mediaRepository.findOne({
+    const media = await this.prisma.media.findUnique({
       where: { id },
-      relations: ['detail', 'director', 'genres', 'creator'],
+      include: {
+        detail: true,
+        director: true,
+        genres: true,
+        creator: true,
+      },
     });
     if (!media) throw new NotFoundException('존재하지 않는 ID입니다.');
 
@@ -150,107 +152,143 @@ export class MediaService {
     }
   }
 
-  async create(dto: createMediaDto, qr: QueryRunner, userId: number) {
-    const isDirectorExists = await qr.manager.exists(Director, {
-      where: { id: dto.directorId },
-    });
-    if (!isDirectorExists) {
-      throw new NotFoundException('존재하지 않는 director ID입니다.');
-    }
-
-    const isTitleExists = await qr.manager.exists(Media, {
-      where: { title: dto.title },
-    });
-
-    if (isTitleExists) {
-      throw new NotFoundException('이미 존재하는 title입니다.');
-    }
-
-    const genres = await qr.manager.find(Genre, {
-      where: { id: In(dto.genreIds) },
-    });
-
-    if (genres.length !== dto.genreIds.length) {
-      throw new NotFoundException(
-        `존재하지 않은 ID의 genre가 있습니다. -> ${genres.map((genre) => genre.id).join(',')}`,
-      );
-    }
-
-    const mediaFolder = join('public', 'media');
-
-    const tempFolder = join('public', 'temp');
-
-    const media = await qr.manager.save(Media, {
-      title: dto.title,
-      genres: genres,
-      detail: { detail: dto.detail },
-      director: { id: dto.directorId },
-      mediaFilePath: join(mediaFolder, dto.mediaFileName),
-      creator: { id: userId },
-    });
-
-    await this.renameMediaFile(tempFolder, mediaFolder, dto);
-
-    return media;
-  }
-
-  async update(id: number, dto: updateMediaDto, qr: QueryRunner) {
-    let media = await qr.manager.findOne(Media, {
-      where: { id },
-      relations: ['detail', 'director', 'genres'],
-    });
-    if (!media) throw new NotFoundException('존재하지 않는 ID입니다.');
-
-    const { detail, directorId, genreIds, ...mediaRest } = dto;
-
-    if (detail) {
-      media.detail.detail = detail;
-    }
-
-    if (directorId) {
-      const isDirectorExists = await qr.manager.exists(Director, {
+  async create(dto: createMediaDto, userId: number) {
+    return this.prisma.$transaction(async (prisma) => {
+      const director = await prisma.director.findUnique({
         where: { id: dto.directorId },
       });
 
-      if (!isDirectorExists) {
+      if (!director) {
         throw new NotFoundException('존재하지 않는 director ID입니다.');
       }
-      media.director = { id: directorId } as Director;
-    }
 
-    if (genreIds && genreIds.length > 0) {
-      const genres = await qr.manager.find(Genre, {
-        where: { id: In(genreIds.map((id) => id)) },
+      const titleCount = await prisma.media.count({
+        where: { title: dto.title },
       });
 
-      if (genres.length !== genreIds.length) {
+      if (titleCount > 0) {
+        throw new ConflictException('이미 존재하는 title입니다.');
+      }
+
+      const genres = await prisma.genre.findMany({
+        where: {
+          id: {
+            in: dto.genreIds,
+          },
+        },
+      });
+
+      if (genres.length !== dto.genreIds.length) {
         throw new NotFoundException(
-          '존재하지 않는 genre ID가 포함되어 있습니다.',
+          `존재하지 않은 ID의 genre가 있습니다. -> ${genres.map((genre) => genre.id).join(',')}`,
         );
       }
 
-      media.genres = genres;
-    }
+      const mediaDetail = await prisma.mediaDetail.create({
+        data: { detail: dto.detail },
+      });
 
-    if (Object.keys(mediaRest).length > 0) {
-      Object.assign(media, mediaRest);
-    }
+      const mediaFolder = join('public', 'media');
 
-    media = await qr.manager.save(Media, media);
+      const tempFolder = join('public', 'temp');
 
-    return media;
+      const media = await prisma.media.create({
+        data: {
+          title: dto.title,
+          mediaFilePath: join(mediaFolder, dto.mediaFileName),
+          creator: { connect: { id: userId } },
+          director: { connect: { id: director.id } },
+          genres: { connect: genres.map((genre) => ({ id: genre.id })) },
+          detail: { connect: { id: mediaDetail.id } },
+        },
+      });
+
+      await this.renameMediaFile(tempFolder, mediaFolder, dto);
+
+      return prisma.media.findUnique({
+        where: { id: media.id },
+        include: { detail: true, director: true, genres: true },
+      });
+    });
+  }
+
+  async update(id: number, dto: updateMediaDto) {
+    return this.prisma.$transaction(async (prisma) => {
+      const media = await prisma.media.findUnique({
+        where: { id },
+        include: { detail: true, director: true, genres: true },
+      });
+
+      if (!media) throw new NotFoundException('존재하지 않는 ID입니다.');
+
+      const { detail, directorId, genreIds, ...mediaRest } = dto;
+
+      const mediaUpdateParams: Prisma.MediaUpdateInput = { ...mediaRest };
+
+      if (directorId) {
+        const director = await prisma.director.findUnique({
+          where: { id: directorId },
+        });
+
+        if (!director)
+          throw new NotFoundException('존재하지 않는 director ID입니다.');
+
+        mediaUpdateParams.director = { connect: { id: directorId } };
+      }
+
+      if (genreIds && genreIds.length > 0) {
+        const genres = await prisma.genre.findMany({
+          where: { id: { in: genreIds } },
+        });
+
+        if (genres.length !== genreIds.length) {
+          throw new NotFoundException(
+            '존재하지 않는 genre ID가 포함되어 있습니다.',
+          );
+        }
+
+        mediaUpdateParams.genres = {
+          set: genres.map((genre) => ({ id: genre.id })),
+        };
+      }
+
+      await prisma.media.update({
+        where: { id },
+        data: mediaUpdateParams,
+      });
+
+      if (detail) {
+        await prisma.mediaDetail.update({
+          where: { id: media.detail.id },
+          data: { detail },
+        });
+      }
+
+      return prisma.media.findUnique({
+        where: { id },
+        include: { detail: true, director: true, genres: true },
+      });
+    });
   }
 
   async remove(id: number) {
-    const media = await this.findOne(id);
-
-    await this.mediaRepository.delete(id);
-    await this.mediadetailRepository.delete(media.detail.id);
-    return id;
+    try {
+      const media = await this.prisma.media.findUnique({
+        where: { id },
+        include: { detail: true },
+      });
+      await this.prisma.media.delete({ where: { id } });
+      await this.prisma.mediaDetail.delete({
+        where: { id: media?.detail.id },
+      });
+      return id;
+    } catch (error) {
+      this.prismaErrorHandler.handle(error);
+    }
   }
 
   async toggleMediaLike(mediaId: number, userId: number, isLike: boolean) {
-    const media = await this.mediaRepository.findOne({
+    const media = await this.prisma.media.findUnique({
       where: { id: mediaId },
     });
 
@@ -258,7 +296,7 @@ export class MediaService {
       throw new BadRequestException('존재하지 않는 미디어입니다.');
     }
 
-    const user = await this.userRepository.findOne({
+    const user = await this.prisma.user.findUnique({
       where: { id: userId },
     });
 
@@ -266,35 +304,34 @@ export class MediaService {
       throw new UnauthorizedException('존재하지 않는 유저입니다.');
     }
 
-    const likeRecord = await this.mediaUserLikeRepository
-      .createQueryBuilder('mul')
-      .leftJoinAndSelect('mul.media', 'media')
-      .leftJoinAndSelect('mul.user', 'user')
-      .where('media.id = :mediaId', { mediaId })
-      .andWhere('user.id = :userId', { userId })
-      .getOne();
+    const likeRecord = await this.prisma.mediaUserLike.findUnique({
+      where: { mediaId_userId: { mediaId, userId } },
+    });
 
     if (likeRecord) {
       if (isLike === likeRecord.isLike) {
-        await this.mediaUserLikeRepository.delete({ media, user });
+        await this.prisma.mediaUserLike.delete({
+          where: { mediaId_userId: { mediaId, userId } },
+        });
       } else {
-        await this.mediaUserLikeRepository.update({ media, user }, { isLike });
+        await this.prisma.mediaUserLike.update({
+          where: { mediaId_userId: { mediaId, userId } },
+          data: { isLike },
+        });
       }
     } else {
-      await this.mediaUserLikeRepository.save({
-        media,
-        user,
-        isLike,
+      await this.prisma.mediaUserLike.create({
+        data: {
+          media: { connect: { id: mediaId } },
+          user: { connect: { id: userId } },
+          isLike,
+        },
       });
     }
 
-    const result = await this.mediaUserLikeRepository
-      .createQueryBuilder('mul')
-      .leftJoinAndSelect('mul.media', 'media')
-      .leftJoinAndSelect('mul.user', 'user')
-      .where('media.id = :mediaId', { mediaId })
-      .andWhere('user.id = :userId', { userId })
-      .getOne();
+    const result = await this.prisma.mediaUserLike.findUnique({
+      where: { mediaId_userId: { mediaId, userId } },
+    });
 
     return {
       isLike: result && result.isLike,

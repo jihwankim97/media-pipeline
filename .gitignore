@@ -145,3 +145,4 @@ redis-data
 
 #res
 public
+migrations

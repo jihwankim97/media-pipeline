@@ -3,7 +3,7 @@ import { Transform } from 'class-transformer';
 import { IsArray, IsInt, IsOptional, IsString } from 'class-validator';
 
 export class CursorPaginationDto {
-  @IsInt()
+  @IsString()
   @IsOptional()
   @ApiProperty({
     description: '페이지네이션 커서',
@@ -28,5 +28,5 @@ export class CursorPaginationDto {
     description: '가져올 데이터 갯수',
     example: 5,
   })
-  take: number = 5;
+  take: number = 2;
 }

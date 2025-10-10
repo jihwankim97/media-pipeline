@@ -7,18 +7,17 @@ import {
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { MediaModule } from './media/media.module';
-import { TypeOrmModule } from '@nestjs/typeorm';
+
 import { ConditionalModule, ConfigModule, ConfigService } from '@nestjs/config';
 import * as Joi from 'joi';
-import { Media } from './media/entity/media.entity';
-import { MediaDetail } from './media/entity/media.detail.entity';
+
 import { DirectorModule } from './director/director.module';
-import { Director } from './director/entity/director.entity';
+
 import { GenreModule } from './genre/genre.module';
-import { Genre } from './genre/entities/genre.entity';
+
 import { AuthModule } from './auth/auth.module';
 import { UserModule } from './user/user.module';
-import { User } from './user/entities/user.entity';
+
 import { BearerTokenMiddleware } from './auth/middleware/bearer-token.middleware';
 import { JwtModule } from '@nestjs/jwt';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
@@ -29,7 +28,7 @@ import { ResponseTimeInterceptor } from './common/interceptor/response-time.inte
 import { QueryExeptionFilter } from './common/filter/query-faild.filter';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
-import { MediaUserLike } from './media/entity/media-user-like.entity';
+
 import { CacheModule } from '@nestjs/cache-manager';
 import { ThrottleInterceptor } from './common/interceptor/throttle.interceptor';
 import { ScheduleModule } from '@nestjs/schedule';
@@ -43,10 +42,7 @@ import { WorkerModul } from './worker/worker.module';
       validationSchema: Joi.object({
         ENV: Joi.string().valid('dev', 'prod').required(),
         DB_TYPE: Joi.string().valid('postgres').required(),
-        DB_HOST: Joi.string().required(),
-        DB_PORT: Joi.number().required(),
-        DB_PASSWORD: Joi.string().required(),
-        DB_DATABASE: Joi.string().required(),
+        DB_URL: Joi.string().valid().required(),
         HASH_ROUNDS: Joi.number().required(),
         ACCESS_TOKEN_SECRET: Joi.string().required(),
         REFRESH_TOKEN_SECRET: Joi.string().required(),
@@ -54,25 +50,6 @@ import { WorkerModul } from './worker/worker.module';
         AWS_SECRET_ACCESS_KEY: Joi.string().required(),
         AWS_REGION: Joi.string().required(),
       }),
-    }),
-    TypeOrmModule.forRootAsync({
-      useFactory: (configService: ConfigService) => ({
-        type: configService.get<string>('DB_TYPE') as 'postgres',
-        host: configService.get<string>('DB_HOST'),
-        port: configService.get<number>('DB_PORT'),
-        username: configService.get<string>('DB_USERNAME'),
-        password: configService.get<string>('DB_PASSWORD'),
-        database: configService.get<string>('DB_DATABASE'),
-        entities: [Media, MediaDetail, Director, Genre, User, MediaUserLike],
-        synchronize: configService.get<string>('ENV') === 'prod' ? false : true,
-        ssl:
-          configService.get<string>('ENV') === 'prod'
-            ? {
-                rejectUnauthorized: false,
-              }
-            : false,
-      }),
-      inject: [ConfigService],
     }),
     ServeStaticModule.forRoot({
       rootPath: join(process.cwd(), 'public'),
