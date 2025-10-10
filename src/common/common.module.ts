@@ -7,6 +7,8 @@ import { join } from 'path';
 import { randomUUID } from 'crypto';
 import { TasksService } from './tasks.service';
 import { BullModule } from '@nestjs/bullmq';
+import { PrismaService } from './prisma.service';
+import { PrismaErrorHandlerService } from './prisma-error-handler.service';
 
 @Module({
   imports: [
@@ -36,7 +38,12 @@ import { BullModule } from '@nestjs/bullmq';
     }),
   ],
   controllers: [CommonController],
-  providers: [CommonService, TasksService],
-  exports: [CommonService],
+  providers: [
+    CommonService,
+    TasksService,
+    PrismaService,
+    PrismaErrorHandlerService,
+  ],
+  exports: [CommonService, PrismaService, PrismaErrorHandlerService],
 })
 export class CommonModule {}

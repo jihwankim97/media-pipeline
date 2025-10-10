@@ -1,4 +1,4 @@
-import { Role } from 'src/user/entities/user.entity';
+import { Role } from '@prisma/client';
 
 export interface JwtPayload {
   sub: number;

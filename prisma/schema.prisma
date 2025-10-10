@@ -1,0 +1,87 @@
+datasource db {
+    provider    ="postgresql"
+    url         =env("DB_URL")
+}
+
+generator client {
+    provider = "prisma-client-js"
+    previewFeatures = ["prismaSchemaFolder", "omitApi"]
+}
+
+
+enum Role {
+    admin
+    paidUser
+    user
+}
+
+
+model User {
+    id              Int                 @id @default(autoincrement())
+    email           String              @unique
+    password        String              
+    role            Role                @default(user)
+    medias          Media[]
+    likedMedias     MediaUserLike[]
+    createdAt       DateTime            @default(now())
+    updatedAt       DateTime            @updatedAt @default(now())
+    version         Int                 @default(0)
+
+}
+
+
+model Media {
+    id              Int                 @id @default(autoincrement())
+    creator         User                @relation(fields: [creatorId], references: [id])
+    creatorId       Int
+    title           String              @unique
+    genres          Genre[]
+    likeCount       Int                 @default(0)
+    disLikeCount    Int                 @default(0)
+    detail          MediaDetail         @relation(fields: [detailId], references: [id])
+    detailId        Int                 @unique
+    mediaFilePath   String
+    director        Director            @relation(fields: [directorId], references: [id])
+    directorId      Int                 
+    likeUsers       MediaUserLike[]
+    createdAt       DateTime            @default(now())
+    updatedAt       DateTime            @updatedAt @default(now())
+    version         Int                 @default(0)
+}
+
+model MediaUserLike {
+    media       Media      @relation(fields: [mediaId], references: [id])
+    mediaId     Int 
+    user        User       @relation(fields: [userId], references: [id])
+    userId      Int        
+    isLike      Boolean     
+
+    @@id([mediaId, userId])
+}
+
+model MediaDetail {
+    id      Int     @id @default(autoincrement())
+    detail  String
+    media   Media?
+}
+
+
+model Genre {
+    id      Int         @id @default(autoincrement())
+    name    String      @unique
+    medias  Media[]
+    createdAt       DateTime            @default(now())
+    updatedAt       DateTime            @updatedAt @default(now())
+    version         Int                 @default(0)
+}
+
+model Director {
+    id              Int         @id @default(autoincrement())
+    name            String        
+    dob             DateTime      
+    nationality     String      
+    medias          Media[]  
+    createdAt       DateTime            @default(now())
+    updatedAt       DateTime            @updatedAt @default(now())
+    version         Int                 @default(0)  
+}

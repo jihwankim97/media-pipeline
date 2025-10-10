@@ -13,9 +13,9 @@ import { LocalAuthGuard } from './strategy/local.strategy';
 import { RequestWithUser } from './types/request.types';
 import { Public } from './decorator/public.decorator';
 import { RBAC } from './decorator/rbac.decorator';
-import { Role } from 'src/user/entities/user.entity';
 import { ApiBasicAuth, ApiBearerAuth } from '@nestjs/swagger';
 import { Authorization } from './decorator/authorization.decorator';
+import { Role } from '@prisma/client';
 
 @UseInterceptors(ClassSerializerInterceptor)
 @ApiBearerAuth()
