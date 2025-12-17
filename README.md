@@ -1,98 +1,111 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+## media-pipeline
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+NestJS 기반 미디어 업로드/인코딩 파이프라인 서버입니다. 비디오 업로드부터 썸네일 생성, 캐시, 레이트 리밋, RBAC 인증/인가까지 한 번에 묶어서 볼 수 있는 백엔드 예제를 목표로 했습니다.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+---
 
-## Description
+## 요약
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+- **미디어 파이프라인**: Presigned URL 기반 업로드, 임시 저장소→영구 저장소 승격, FFmpeg 워커로 썸네일 생성, 배치로 고아 파일 정리까지 한 흐름으로 설계했습니다.
+- **인증/인가 레이어**: Basic 로그인→JWT 발급, Access/Refresh 분리, 역할 기반 권한 제어(RBAC)와 전역 가드로 엔드포인트 접근을 통제합니다.
+- **데이터/ORM 전략**: 동일 도메인을 TypeORM(main)과 Prisma(prisma 브랜치) 두 가지 ORM으로 구현해, 실제 코드 레벨에서 장단점을 비교해볼 수 있습니다.
+- **운영 관점 도구**: 응답 시간 로깅, 레이트 리밋, DB 에러 필터링, 스케줄러 등을 공통 레이어로 올려 두어, 실 서비스에 올렸을 때도 바로 쓸 수 있도록 구성했습니다.
 
-## Project setup
+---
+
+## 설계 포인트
+
+### 인증/인가
+
+- **JWT 구조**: 페이로드에 `type` 필드를 둬 `access` / `refresh` 를 명확히 구분하고, 잘못된 타입의 토큰이 들어오면 바로 예외를 던집니다.
+- **토큰 처리 흐름**: Basic 토큰으로 로그인/회원가입을 처리하고, 이후에는 Bearer 토큰을 파싱해 전역 `AuthGuard`, `RBACGuard` 에서 인증/인가를 일관되게 수행합니다.
+- **토큰 블랙리스트**: 캐시(REDIS)를 활용해 차단된 토큰을 저장하고, 유효기간 내라도 강제 로그아웃/토큰 폐기를 할 수 있게 했습니다.
+
+### 미디어 파이프라인
+
+- **업로드 경로**: 개발 환경에서는 로컬 디스크(`public/temp` → `public/media`), 운영 환경에서는 S3 버킷 내 `temp` → `media` 객체 복사 방식으로 분리했습니다.
+- **Presigned URL**: 서버는 S3 Presigned URL 을 발급하고, 클라이언트가 직접 업로드하도록 해, 대용량 파일에서도 서버 자원 사용을 최소화했습니다.
+- **썸네일 생성 워커**: BullMQ 큐(`thumbnail-generation`)와 워커 프로세스를 분리해서, 업로드와 썸네일 생성이 서로 영향을 주지 않도록 설계했습니다.
+- **캐시/배치**: 최근 미디어 리스트는 캐시(`MEDIA_RECENT`)로 제공하고, 크론 잡으로 temp 디렉터리의 오래된 파일을 주기적으로 정리합니다.
+
+### 데이터/ORM
+
+- **TypeORM(main)**: 명시적인 엔티티/연관관계와 QueryBuilder 를 사용해 전통적인 RDB 스타일로 구현했습니다. 트랜잭션은 인터셉터에서 `QueryRunner` 를 열어, 서비스 레이어에서는 도메인 로직에만 집중하도록 했습니다.
+- **Prisma(prisma 브랜치)**: 동일한 유즈케이스를 Prisma 스키마 기반으로 재구성해, 타입 안전성과 생산성 측면의 차이를 비교할 수 있게 했습니다.
+- **PostgreSQL**: 관계가 많은 미디어/유저 도메인을 전제로, 트랜잭션과 인덱스 활용이 유리한 PostgreSQL 을 기본 데이터베이스로 사용합니다.
+
+### 운영/품질
+
+- **응답 시간 로깅**: 전역 인터셉터에서 요청별 처리 시간을 로깅해, 실제 트래픽 환경에서 병목 구간을 쉽게 찾을 수 있습니다.
+- **레이트 리밋**: `@Throttle` 메타데이터와 캐시를 조합해, 유저별/분 단위 요청 횟수를 제한하는 간단한 레이트 리미터를 구현했습니다.
+- **에러 응답 통일**: DB 쿼리 에러, 권한 부족 등의 예외를 필터에서 한 번에 가공해, 클라이언트 관점에서는 일관된 에러 포맷만 보도록 했습니다.
+
+---
+
+## 브랜치 구조 (ORM 전략)
+
+- **main 브랜치**: `TypeORM` 기반 구현입니다. NestJS의 `@nestjs/typeorm` 모듈과 DataSource/QueryBuilder 를 이용해 전통적인 ORM 스타일을 유지했습니다.
+- **prisma 브랜치**: `Prisma` 기반 구현입니다. 같은 도메인 모델을 Prisma 스키마로 정의하고, 타입 세이프한 쿼리와 마이그레이션 플로우를 실험했습니다.
+- **의도**: 하나의 서비스 도메인을 두 ORM 으로 구현해보면서, 팀 상황에 따라 어떤 선택이 더 맞는지 근거를 가지고 이야기할 수 있도록 하기 위함입니다.
+
+---
+
+## 기술 스택 (선택 이유)
+
+- **NestJS 11 + TypeScript 5**: 모듈/DI/가드/인터셉터 개념이 명확해서, 인증 · 미디어 도메인 · 인프라 레이어를 깔끔하게 분리할 수 있습니다.
+- **PostgreSQL**: 다대다 관계(미디어–장르, 미디어–유저 좋아요 등)가 많은 도메인에서 안정적인 트랜잭션과 인덱스 전략을 가져갈 수 있습니다.
+- **TypeORM / Prisma**: main(prd 성격의 전통 ORM)과 prisma(스키마 우선 + 타입 세이프 ORM)를 나란히 두고, 실제 코드 베이스 안에서 장단점을 비교하는 용도로 사용했습니다.
+- **Redis + BullMQ**: 썸네일 생성 같은 비동기 작업을 큐로 분리해 API 레이턴시를 줄이고, 재시도/워커 스케일 아웃을 고려한 구조를 만들었습니다.
+- **AWS S3 + Presigned URL**: 대용량 미디어 업로드를 서버에서 직접 받지 않고, 클라이언트→S3 직통으로 처리해 리소스 사용과 보안을 함께 잡았습니다.
+- **FFmpeg (fluent-ffmpeg, ffprobe)**: 썸네일 추출과 향후 인코딩 확장을 고려해, 가장 범용적인 미디어 처리 도구를 선택했습니다.
+- **Jest / ESLint / Prettier**: 최소한의 테스트와 코드 스타일 가드로, 리팩터링 시 안정성을 확보하고 팀 합류 시 규칙 공유를 쉽게 하기 위해 사용했습니다.
+
+---
+
+## 실행 방법
+
+### 환경 변수 예시
+
+- **DB / 애플리케이션**
+  - `ENV`: `dev` 또는 `prod`
+  - `DB_TYPE`: `postgres`
+  - `DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD`, `DB_DATABASE`
+- **인증**
+  - `HASH_ROUNDS`: 비밀번호 해시 라운드 수 (예: `10`)
+  - `ACCESS_TOKEN_SECRET`, `REFRESH_TOKEN_SECRET`
+- **Redis / 큐**
+  - `REDIS_HOST`, `REDIS_PORT`
+- **AWS S3**
+  - `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`, `AWS_S3_BUCKET_NAME`
+
+### 개발 환경 실행
 
 ```bash
-$ pnpm install
+pnpm install
+
+docker compose up -d postgres redis
+
+pnpm run start:dev
 ```
 
-## Compile and run the project
+워커 프로세스는 별도 터미널에서 아래처럼 띄웁니다.
 
 ```bash
-# development
-$ pnpm run start
-
-# watch mode
-$ pnpm run start:dev
-
-# production mode
-$ pnpm run start:prod
+TYPE=worker PORT=3001 pnpm run start:dev
+# 또는 package.json 스크립트: pnpm run start:dev:worker
 ```
 
-## Run tests
+테스트는 필요 시 아래 명령으로 실행합니다.
 
 ```bash
-# unit tests
-$ pnpm run test
-
-# e2e tests
-$ pnpm run test:e2e
-
-# test coverage
-$ pnpm run test:cov
+pnpm run test       # 유닛 테스트
+pnpm run test:cov   # 커버리지 리포트
 ```
 
-## Deployment
+---
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+## 이후 확장 아이디어
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
-
-```bash
-$ pnpm install -g mau
-$ mau deploy
-```
-
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
-
-## Resources
-
-Check out a few resources that may come in handy when working with NestJS:
-
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+- **관측 강화**: APM, 중앙 로그 수집, 메트릭 대시보드와 연동해 썸네일 실패율, 업로드 성공률 등을 모니터링.
+- **콘텐츠 정책/권한**: 미디어 접근 권한을 유저 플랜(무료/유료)과 연동하거나, 지역 기반 제한 같은 정책을 레이어로 추가.
+- **관리 도구**: 관리자용 대시보드 API(메타데이터 일괄 수정, 통계 조회 등)를 얹어서 운영 편의성을 높이는 방향으로 확장 가능.
